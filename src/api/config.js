@@ -12,7 +12,7 @@
 //
 // Change BASE_URL below to match your setup.
 // export const BASE_URL = "http://192.168.1.53:8080";
-export const BASE_URL = "http://localhost:8080";
+export const BASE_URL = "https://seat-manager-backend-production-bb04.up.railway.app";
 // export const BASE_URL =
 //   "https://seat-manager-backend-production-bb04.up.railway.app";
 
