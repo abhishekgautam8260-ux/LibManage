@@ -11,8 +11,6 @@ export default function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="DashboardHome" component={DashboardScreen} />
-
-      <Stack.Screen name="HalfDayStudents" component={HalfDayStudentsScreen} />
     </Stack.Navigator>
   );
 }

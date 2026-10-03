@@ -29,16 +29,12 @@ export async function getSeatChangeHistory(studentId, libraryId) {
 
 // Update a student's details from the Edit modal (Name / Phone / Seat / EndDate).
 // Reuses the same shape as dashboard.js's updateStudent — same backend entity.
-export async function updateStudentRecord(
-  studentId,
-  { name, phone, seatNumber, endDate }
-) {
-  const res = await client.put(`/api/student/${studentId}`, {
-    name,
-    phone,
-    seatNumber: parseInt(seatNumber, 10),
-    expireDate: endDate,
-  });
+export async function updateStudentRecord(seatNumber, libraryId, payload) {
+  const res = await client.put(
+    `/api/student/${seatNumber}/library/${libraryId}`,
+    payload
+  );
+
   return res.data;
 }
 
@@ -99,6 +95,14 @@ export async function getStudentsPaginated(
       search: search.trim(),
     },
   });
+
+  return res.data;
+}
+
+export async function deleteStudentRecord(studentId, libraryId) {
+  const res = await client.delete(
+    `/api/student/${studentId}/library/${libraryId}`
+  );
 
   return res.data;
 }

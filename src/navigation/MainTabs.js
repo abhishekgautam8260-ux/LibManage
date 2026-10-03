@@ -7,10 +7,12 @@ import HomeStack from "./HomeStack";
 import BillingScreen from "../screens/BillingScreen";
 import StudentsScreen from "../screens/StudentsScreen";
 import ProfileScreen from "../screens/ProfileScreen";
+import HalfDayStudentsScreen from "../screens/HalfDayStudentsScreen";
 
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { lightColors, darkColors } from "../theme/colors";
+import { Platform, useWindowDimensions } from "react-native";
 
 const Tab = createBottomTabNavigator();
 
@@ -23,6 +25,10 @@ export default function MainTabs() {
     canViewStudents,
     canManageBilling,
   } = useAuth();
+
+  const { width } = useWindowDimensions();
+
+  const isDesktopWeb = Platform.OS === "web" && width >= 1000;
 
   const { isDarkMode } = useTheme();
 
@@ -51,25 +57,24 @@ export default function MainTabs() {
         // =====================================================
 
         tabBarActiveTintColor: colors.primaryBlue,
-
-        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarInactiveTintColor: colors.textMuted,
 
         // =====================================================
         // TAB BAR
         // =====================================================
 
-        tabBarStyle: {
-          height: 64,
-
-          paddingBottom: 8,
-          paddingTop: 6,
-
-          backgroundColor: colors.card,
-
-          borderTopColor: colors.border,
-
-          borderTopWidth: 1,
-        },
+        tabBarStyle: isDesktopWeb
+          ? {
+              display: "none",
+            }
+          : {
+              height: 64,
+              paddingBottom: 8,
+              paddingTop: 6,
+              backgroundColor: colors.card,
+              borderTopColor: colors.border,
+              borderTopWidth: 1,
+            },
 
         // =====================================================
         // TAB LABEL
@@ -89,11 +94,16 @@ export default function MainTabs() {
             Home: "house",
             Billing: "wallet",
             Students: "user-graduate",
+            HalfDayStudents: "clock",
             Profile: "user",
           };
 
           return (
-            <FontAwesome6 name={icons[route.name]} size={18} color={color} />
+            <FontAwesome6
+              name={icons[route.name] || "circle"}
+              size={18}
+              color={color}
+            />
           );
         },
       })}
@@ -114,10 +124,6 @@ export default function MainTabs() {
 
       {/* =====================================================
           BILLING
-          
-          ADMIN
-          MANAGER
-          ACCOUNTANT
       ===================================================== */}
 
       {canManageBilling && (
@@ -145,9 +151,19 @@ export default function MainTabs() {
       )}
 
       {/* =====================================================
+          HALF DAY STUDENTS
+      ===================================================== */}
+
+      <Tab.Screen
+        name="HalfDayStudents"
+        component={HalfDayStudentsScreen}
+        options={{
+          title: "Half Day",
+        }}
+      />
+
+      {/* =====================================================
           PROFILE
-          
-          All authenticated users
       ===================================================== */}
 
       <Tab.Screen

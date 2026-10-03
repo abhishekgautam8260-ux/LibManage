@@ -5,14 +5,21 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "icon": "./assets/icon.png",
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.seatmanager.app",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
+      "package": "com.seatmanager.app",
       "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#f6f8fc"
       }
     },
@@ -25,7 +32,9 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#f6f8fc"
+          "backgroundColor": "#f6f8fc",
+          "image": "./assets/icon.png",
+          "imageWidth": 200
         }
       ],
       "@react-native-community/datetimepicker",

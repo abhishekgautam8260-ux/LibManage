@@ -30,7 +30,9 @@ import {
   deleteExpense,
 } from "../api/billing";
 
-import { colors, spacing } from "../theme/colors";
+import { lightColors, darkColors, spacing } from "../theme/colors";
+
+import { useTheme } from "../context/ThemeContext";
 
 // ============================================================
 // CATEGORY INFORMATION
@@ -80,8 +82,28 @@ const CATEGORY_INFO = {
   },
 };
 
-function getCategoryInfo(category = "") {
-  return CATEGORY_INFO[String(category).toLowerCase()] || CATEGORY_INFO.other;
+function getCategoryInfo(category = "", isDarkMode = false) {
+  const key = String(category).toLowerCase();
+
+  const info = CATEGORY_INFO[key] || CATEGORY_INFO.other;
+
+  if (!isDarkMode) {
+    return info;
+  }
+
+  const darkBackgrounds = {
+    electricity: "#3d2e12",
+    water: "#1e3a8a",
+    employee: "#312e81",
+    wifi: "#083344",
+    rent: "#3f1d1d",
+    other: "#273449",
+  };
+
+  return {
+    ...info,
+    bg: darkBackgrounds[key] || darkBackgrounds.other,
+  };
 }
 
 // ============================================================
@@ -144,7 +166,9 @@ function getAvailableYears() {
   const currentYear = new Date().getFullYear();
 
   return Array.from(
-    { length: currentYear - 2000 + 1 },
+    {
+      length: currentYear - 2000 + 1,
+    },
     (_, index) => currentYear - index
   );
 }
@@ -156,11 +180,29 @@ function getAvailableYears() {
 export default function BillingScreen() {
   const { libraryId } = useAuth();
 
+  const { isDarkMode } = useTheme();
+
+  // ==========================================================
+  // THEME
+  // ==========================================================
+
+  const colors = isDarkMode ? darkColors : lightColors;
+
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
+  // ==========================================================
+  // DATE
+  // ==========================================================
+
   const now = new Date();
 
   const [selectedYear, setSelectedYear] = useState(now.getFullYear());
 
   const [selectedMonth, setSelectedMonth] = useState(now.getMonth() + 1);
+
+  // ==========================================================
+  // STATE
+  // ==========================================================
 
   const [summary, setSummary] = useState(null);
 
@@ -324,10 +366,6 @@ export default function BillingScreen() {
 
     let month = selectedMonth;
 
-    /*
-     * If selecting the current year and the currently selected
-     * month is in the future, automatically move to current month.
-     */
     if (year === currentYear && month > currentMonth) {
       month = currentMonth;
     }
@@ -339,15 +377,15 @@ export default function BillingScreen() {
     await loadSummary(year, month);
   };
 
-  // ============================================================
+  // ==========================================================
   // MONTH NAME
-  // ============================================================
+  // ==========================================================
 
   const selectedMonthName = MONTHS[selectedMonth - 1]?.label || "";
 
-  // ============================================================
+  // ==========================================================
   // SUMMARY VALUES
-  // ============================================================
+  // ==========================================================
 
   const monthlyRevenue = Number(summary?.monthlyRevenue || 0);
 
@@ -357,9 +395,9 @@ export default function BillingScreen() {
 
   const averageProfit = Number(summary?.averageMonthlyProfit || 0);
 
-  // ============================================================
+  // ==========================================================
   // MONTH EXPENSE LIST
-  // ============================================================
+  // ==========================================================
 
   const monthlyExpensesList = useMemo(() => {
     return expenses
@@ -395,28 +433,28 @@ export default function BillingScreen() {
         key,
         type: "expense",
         amount,
-        info: getCategoryInfo(key),
+        info: getCategoryInfo(key, isDarkMode),
       }))
       .sort((a, b) => b.amount - a.amount);
 
-    /*
-     * Revenue = Expense + Profit
-     *
-     * Only add Profit as a circular segment when
-     * profit is positive.
-     */
     if (monthlyProfit > 0) {
       expenseItems.push({
         key: "profit",
+
         type: "profit",
+
         amount: monthlyProfit,
+
         percentage:
           monthlyRevenue > 0 ? (monthlyProfit / monthlyRevenue) * 100 : 0,
+
         info: {
           icon: "chart-line",
           emoji: "📈",
-          color: "#10b981",
-          bg: "#ecfdf5",
+
+          color: isDarkMode ? "#4ADE80" : "#10b981",
+
+          bg: isDarkMode ? colors.successBg : "#ecfdf5",
         },
       });
     }
@@ -426,7 +464,13 @@ export default function BillingScreen() {
 
       percentage: monthlyRevenue > 0 ? (item.amount / monthlyRevenue) * 100 : 0,
     }));
-  }, [monthlyExpensesList, monthlyRevenue, monthlyProfit]);
+  }, [
+    monthlyExpensesList,
+    monthlyRevenue,
+    monthlyProfit,
+    isDarkMode,
+    colors.successBg,
+  ]);
 
   // ============================================================
   // SAVE EXPENSE
@@ -591,34 +635,38 @@ export default function BillingScreen() {
                 label="Revenue"
                 value={monthlyRevenue}
                 icon="money-bill-wave"
-                iconBg="#ecfdf5"
-                iconColor="#10b981"
+                iconBg={isDarkMode ? colors.successBg : "#ecfdf5"}
+                iconColor={isDarkMode ? "#4ADE80" : "#10b981"}
+                styles={styles}
               />
 
               <SummaryCard
                 label="Expenses"
                 value={monthlyExpenses}
                 icon="arrow-trend-down"
-                iconBg="#fef2f2"
-                iconColor="#ef4444"
+                iconBg={isDarkMode ? colors.dangerBg : "#fef2f2"}
+                iconColor={isDarkMode ? "#F87171" : "#ef4444"}
+                styles={styles}
               />
 
               <SummaryCard
                 label="Net Profit"
                 value={monthlyProfit}
                 icon="chart-line"
-                iconBg="#eff6ff"
+                iconBg={isDarkMode ? colors.statBlueBg : "#eff6ff"}
                 iconColor={
                   monthlyProfit >= 0 ? colors.primaryBlue : colors.danger
                 }
+                styles={styles}
               />
 
               <SummaryCard
                 label="Avg. Profit"
                 value={averageProfit}
                 icon="chart-pie"
-                iconBg="#f5f3ff"
-                iconColor="#8b5cf6"
+                iconBg={isDarkMode ? colors.statPurpleBg : "#f5f3ff"}
+                iconColor={isDarkMode ? "#A78BFA" : "#8b5cf6"}
+                styles={styles}
               />
             </View>
 
@@ -635,6 +683,9 @@ export default function BillingScreen() {
               revenue={monthlyRevenue}
               profit={monthlyProfit}
               onMonthPress={() => setMonthPickerVisible(true)}
+              styles={styles}
+              colors={colors}
+              isDarkMode={isDarkMode}
             />
 
             {/* ==================================================
@@ -664,17 +715,9 @@ export default function BillingScreen() {
             </View>
           </View>
         }
-        // ========================================================
-        // EMPTY
-        // ========================================================
-
-        ListEmptyComponent={<EmptyExpenses />}
-        // ========================================================
-        // EXPENSE ITEM
-        // ========================================================
-
+        ListEmptyComponent={<EmptyExpenses styles={styles} colors={colors} />}
         renderItem={({ item, index }) => {
-          const info = getCategoryInfo(item.category);
+          const info = getCategoryInfo(item.category, isDarkMode);
 
           const isPaid = String(item.status || "PAID").toUpperCase() === "PAID";
 
@@ -823,6 +866,9 @@ export default function BillingScreen() {
         onSelectMonth={changeMonth}
         onSelectYear={changeYear}
         onClose={() => setMonthPickerVisible(false)}
+        styles={styles}
+        colors={colors}
+        isDarkMode={isDarkMode}
       />
     </View>
   );
@@ -832,7 +878,7 @@ export default function BillingScreen() {
 // SUMMARY CARD
 // ============================================================
 
-function SummaryCard({ label, value, icon, iconBg, iconColor }) {
+function SummaryCard({ label, value, icon, iconBg, iconColor, styles }) {
   return (
     <View style={styles.summaryCard}>
       <View style={styles.summaryCardTop}>
@@ -859,10 +905,6 @@ function SummaryCard({ label, value, icon, iconBg, iconColor }) {
 // FINANCIAL OVERVIEW
 // ============================================================
 
-// ============================================================
-// FINANCIAL OVERVIEW
-// ============================================================
-
 function FinancialOverview({
   monthName,
   year,
@@ -872,6 +914,9 @@ function FinancialOverview({
   revenue,
   profit,
   onMonthPress,
+  styles,
+  colors,
+  isDarkMode,
 }) {
   const chartData = breakdown;
 
@@ -944,6 +989,9 @@ function FinancialOverview({
               total={chartTotal}
               revenue={revenue}
               profit={profit}
+              styles={styles}
+              colors={colors}
+              isDarkMode={isDarkMode}
             />
 
             <View style={styles.breakdownList}>
@@ -1028,7 +1076,7 @@ function FinancialOverview({
                   style={[
                     styles.financeMiniDot,
                     {
-                      backgroundColor: "#ef4444",
+                      backgroundColor: isDarkMode ? "#F87171" : "#ef4444",
                     },
                   ]}
                 />
@@ -1057,7 +1105,14 @@ function FinancialOverview({
                   style={[
                     styles.financeMiniDot,
                     {
-                      backgroundColor: profit >= 0 ? "#10b981" : "#ef4444",
+                      backgroundColor:
+                        profit >= 0
+                          ? isDarkMode
+                            ? "#4ADE80"
+                            : "#10b981"
+                          : isDarkMode
+                          ? "#F87171"
+                          : "#ef4444",
                     },
                   ]}
                 />
@@ -1092,7 +1147,11 @@ function FinancialOverview({
           {profit > 0 && revenue > 0 && (
             <View style={styles.profitMessage}>
               <View style={styles.profitMessageIcon}>
-                <FontAwesome6 name="arrow-trend-up" size={11} color="#059669" />
+                <FontAwesome6
+                  name="arrow-trend-up"
+                  size={11}
+                  color={isDarkMode ? "#4ADE80" : "#059669"}
+                />
               </View>
 
               <View style={styles.profitMessageTextWrap}>
@@ -1120,7 +1179,15 @@ function FinancialOverview({
 // DONUT CHART
 // ============================================================
 
-function DonutChart({ data, total, revenue, profit }) {
+function DonutChart({
+  data,
+  total,
+  revenue,
+  profit,
+  styles,
+  colors,
+  isDarkMode,
+}) {
   const size = 180;
 
   const strokeWidth = 28;
@@ -1161,7 +1228,7 @@ function DonutChart({ data, total, revenue, profit }) {
             cx={size / 2}
             cy={size / 2}
             r={radiusValue}
-            stroke="#eef2f7"
+            stroke={isDarkMode ? "#334155" : "#eef2f7"}
             strokeWidth={strokeWidth}
             fill="transparent"
           />
@@ -1204,7 +1271,15 @@ function DonutChart({ data, total, revenue, profit }) {
           <FontAwesome6
             name="chart-line"
             size={11}
-            color={profit >= 0 ? "#10b981" : "#ef4444"}
+            color={
+              profit >= 0
+                ? isDarkMode
+                  ? "#4ADE80"
+                  : "#10b981"
+                : isDarkMode
+                ? "#F87171"
+                : "#ef4444"
+            }
           />
         </View>
 
@@ -1222,7 +1297,7 @@ function DonutChart({ data, total, revenue, profit }) {
 // EMPTY EXPENSES
 // ============================================================
 
-function EmptyExpenses() {
+function EmptyExpenses({ styles, colors }) {
   return (
     <View style={styles.emptyCard}>
       <View style={styles.emptyIcon}>
@@ -1251,6 +1326,9 @@ function BillingPeriodPicker({
   onSelectMonth,
   onSelectYear,
   onClose,
+  styles,
+  colors,
+  isDarkMode,
 }) {
   const years = useMemo(() => getAvailableYears(), []);
 
@@ -1426,7 +1504,11 @@ function BillingPeriodPicker({
                     </Text>
 
                     {locked ? (
-                      <FontAwesome6 name="lock" size={8} color="#cbd5e1" />
+                      <FontAwesome6
+                        name="lock"
+                        size={8}
+                        color={isDarkMode ? "#64748B" : "#cbd5e1"}
+                      />
                     ) : active ? (
                       <View style={styles.monthCheck}>
                         <FontAwesome6
@@ -1463,1172 +1545,1306 @@ function BillingPeriodPicker({
   );
 }
 
-// ============================================================
-// STYLES
-// ============================================================
+function createStyles(colors) {
+  return StyleSheet.create({
+    // ==========================================================
+    // CONTAINER
+    // ==========================================================
 
-const styles = StyleSheet.create({
-  // ==========================================================
-  // CONTAINER
-  // ==========================================================
-
-  container: {
-    flex: 1,
-  },
-
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.bg,
-  },
-
-  loadingText: {
-    marginTop: 10,
-    fontSize: 13,
-    color: colors.textSecondary,
-  },
-
-  listContent: {
-    padding: spacing.md,
-    paddingBottom: 50,
-  },
-
-  // ==========================================================
-  // SUMMARY
-  // ==========================================================
-
-  summaryGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    justifyContent: "space-between",
-    gap: 11,
-    marginBottom: 14,
-  },
-
-  summaryCard: {
-    width: "48.2%",
-    backgroundColor: "#fff",
-    borderRadius: 18,
-    padding: 15,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.045,
-    shadowRadius: 10,
-
-    shadowOffset: {
-      width: 0,
-      height: 3,
+    container: {
+      flex: 1,
+      backgroundColor: colors.bg,
     },
 
-    elevation: 2,
-  },
-
-  summaryCardTop: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-
-  summaryLabel: {
-    fontSize: 12,
-    fontWeight: "400",
-    color: colors.textSecondary,
-  },
-
-  summaryIcon: {
-    width: 29,
-    height: 29,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  summaryValue: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: colors.textPrimary,
-    marginTop: 10,
-  },
-
-  // ==========================================================
-  // OVERVIEW
-  // ==========================================================
-
-  // ==========================================================
-  // OVERVIEW
-  // ==========================================================
-
-  overviewCard: {
-    backgroundColor: "#fff",
-
-    borderRadius: 20,
-
-    padding: 16,
-
-    marginBottom: 20,
-
-    shadowColor: "#000",
-    shadowOpacity: 0.045,
-    shadowRadius: 12,
-
-    shadowOffset: {
-      width: 0,
-      height: 4,
+    center: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.bg,
     },
 
-    elevation: 2,
-  },
-
-  overviewHeader: {
-    flexDirection: "row",
-
-    justifyContent: "space-between",
-
-    alignItems: "center",
-
-    marginBottom: 10,
-  },
-
-  overviewTitleArea: {
-    flex: 1,
-
-    paddingRight: 8,
-  },
-
-  chartTitle: {
-    fontSize: 16,
-
-    fontWeight: "700",
-
-    color: colors.textPrimary,
-  },
-
-  chartSubtitle: {
-    fontSize: 12,
-
-    color: colors.textSecondary,
-
-    marginTop: 3,
-  },
-
-  periodSelector: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    gap: 7,
-
-    paddingHorizontal: 9,
-
-    paddingVertical: 8,
-
-    borderRadius: 12,
-
-    backgroundColor: "#eff6ff",
-  },
-
-  calendarIconBox: {
-    width: 25,
-
-    height: 25,
-
-    borderRadius: 8,
-
-    backgroundColor: "#fff",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  periodSelectorText: {
-    fontSize: 11,
-
-    fontWeight: "800",
-
-    color: colors.primaryBlue,
-  },
-
-  periodSelectorHint: {
-    fontSize: 8,
-
-    color: colors.textSecondary,
-
-    marginTop: 1,
-  },
-
-  chartLoading: {
-    height: 270,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  // ==========================================================
-  // DONUT
-  // ==========================================================
-
-  donutSection: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    minHeight: 210,
-  },
-
-  donutWrap: {
-    width: 180,
-
-    height: 180,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  donutCenter: {
-    position: "absolute",
-
-    width: 110,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  donutCenterIcon: {
-    width: 24,
-
-    height: 24,
-
-    borderRadius: 8,
-
-    backgroundColor: "#f0fdf4",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-
-    marginBottom: 4,
-  },
-
-  donutCenterAmount: {
-    fontSize: 16,
-
-    fontWeight: "800",
-
-    color: colors.textPrimary,
-
-    textAlign: "center",
-  },
-
-  donutCenterLabel: {
-    fontSize: 7,
-
-    fontWeight: "800",
-
-    color: colors.textFaint,
-
-    marginTop: 3,
-
-    textAlign: "center",
-
-    letterSpacing: 0.3,
-  },
-
-  donutEmpty: {
-    width: 180,
-
-    height: 180,
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  emptyDonutRing: {
-    width: 150,
-
-    height: 150,
-
-    borderRadius: 75,
-
-    borderWidth: 25,
-
-    borderColor: "#eef2f7",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-  },
-
-  donutEmptyAmount: {
-    fontSize: 14,
-
-    fontWeight: "800",
-
-    color: colors.textPrimary,
-
-    marginTop: 5,
-  },
-
-  // ==========================================================
-  // BREAKDOWN
-  // ==========================================================
-
-  breakdownList: {
-    flex: 1,
-
-    marginLeft: 7,
-
-    gap: 10,
-
-    minWidth: 0,
-  },
-
-  breakdownRow: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    minWidth: 0,
-  },
-
-  breakdownDot: {
-    width: 8,
-
-    height: 8,
-
-    borderRadius: 4,
-
-    marginRight: 7,
-  },
-
-  breakdownNameWrap: {
-    flex: 1,
-
-    minWidth: 0,
-  },
-
-  breakdownName: {
-    fontSize: 11,
-
-    fontWeight: "600",
-
-    color: colors.textSecondary,
-  },
-
-  breakdownPercent: {
-    width: 31,
-
-    fontSize: 10,
-
-    fontWeight: "700",
-
-    color: colors.textPrimary,
-
-    textAlign: "right",
-  },
-
-  profitPercent: {
-    color: "#059669",
-
-    fontWeight: "800",
-  },
-
-  breakdownAmount: {
-    width: 62,
-
-    fontSize: 10,
-
-    fontWeight: "700",
-
-    color: colors.textPrimary,
-
-    textAlign: "right",
-  },
-
-  profitAmount: {
-    color: "#059669",
-
-    fontWeight: "800",
-  },
-
-  noBreakdownBox: {
-    alignItems: "flex-start",
-
-    gap: 7,
-  },
-
-  noBreakdown: {
-    fontSize: 11,
-
-    color: colors.textFaint,
-
-    lineHeight: 17,
-  },
-
-  // ==========================================================
-  // FINANCE STRIP
-  // ==========================================================
-
-  financeStrip: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    backgroundColor: "#f8fafc",
-
-    borderRadius: 14,
-
-    paddingVertical: 12,
-
-    paddingHorizontal: 14,
-
-    marginTop: 6,
-  },
-
-  financeItem: {
-    flex: 1,
-  },
-
-  financeDivider: {
-    width: 1,
-
-    height: 43,
-
-    backgroundColor: "#e2e8f0",
-
-    marginHorizontal: 14,
-  },
-
-  financeLabelRow: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    gap: 5,
-
-    marginBottom: 3,
-  },
-
-  financeMiniDot: {
-    width: 5,
-
-    height: 5,
-
-    borderRadius: 3,
-  },
-
-  financeLabel: {
-    fontSize: 10,
-
-    color: colors.textFaint,
-  },
-
-  financeExpense: {
-    fontSize: 15,
-
-    fontWeight: "700",
-
-    color: "#ef4444",
-  },
-
-  financeRevenue: {
-    fontSize: 15,
-
-    fontWeight: "700",
-
-    color: "#059669",
-  },
-
-  financeProfit: {
-    fontSize: 15,
-
-    fontWeight: "700",
-
-    color: "#059669",
-  },
-
-  financeLoss: {
-    fontSize: 15,
-
-    fontWeight: "700",
-
-    color: colors.danger,
-  },
-
-  financePercentage: {
-    fontSize: 8,
-
-    color: colors.textFaint,
-
-    marginTop: 2,
-  },
-
-  financeLossPercentage: {
-    fontSize: 8,
-
-    color: "#ef4444",
-
-    marginTop: 2,
-
-    fontWeight: "600",
-  },
-
-  // ==========================================================
-  // PROFIT MESSAGE
-  // ==========================================================
-
-  profitMessage: {
-    flexDirection: "row",
-
-    alignItems: "center",
-
-    marginTop: 10,
-
-    paddingHorizontal: 11,
-
-    paddingVertical: 9,
-
-    borderRadius: 12,
-
-    backgroundColor: "#f0fdf4",
-
-    borderWidth: 1,
-
-    borderColor: "#dcfce7",
-  },
-
-  profitMessageIcon: {
-    width: 27,
-
-    height: 27,
-
-    borderRadius: 9,
-
-    backgroundColor: "#dcfce7",
-
-    alignItems: "center",
-
-    justifyContent: "center",
-
-    marginRight: 8,
-  },
-
-  profitMessageTextWrap: {
-    flex: 1,
-  },
-
-  profitMessageTitle: {
-    fontSize: 10,
-
-    fontWeight: "800",
-
-    color: "#047857",
-  },
-
-  profitMessageSubtitle: {
-    fontSize: 8,
-
-    color: "#6b7280",
-
-    marginTop: 2,
-  },
-
-  profitMessageAmount: {
-    fontSize: 12,
-
-    fontWeight: "800",
-
-    color: "#059669",
-  },
-
-  // ==========================================================
-  // SECTION
-  // ==========================================================
-
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 11,
-  },
-
-  sectionTitleArea: {
-    flex: 1,
-  },
-
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-
-  sectionSubtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 3,
-  },
-
-  addButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-
-    backgroundColor: colors.primaryBlue,
-
-    paddingHorizontal: 13,
-    paddingVertical: 10,
-
-    borderRadius: 12,
-
-    shadowColor: colors.primaryBlue,
-    shadowOpacity: 0.18,
-    shadowRadius: 7,
-
-    shadowOffset: {
-      width: 0,
-      height: 3,
+    loadingText: {
+      marginTop: 10,
+      fontSize: 13,
+      color: colors.textSecondary,
     },
 
-    elevation: 2,
-  },
-
-  addButtonText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  // ==========================================================
-  // EXPENSE CARD
-  // ==========================================================
-
-  expenseCard: {
-    backgroundColor: "#fff",
-
-    borderRadius: 17,
-
-    paddingVertical: 12,
-    paddingHorizontal: 11,
-
-    marginBottom: 9,
-
-    flexDirection: "row",
-    alignItems: "center",
-
-    borderWidth: 1,
-    borderColor: "#f1f5f9",
-
-    shadowColor: "#000",
-    shadowOpacity: 0.035,
-    shadowRadius: 8,
-
-    shadowOffset: {
-      width: 0,
-      height: 2,
+    listContent: {
+      padding: spacing.md,
+      paddingBottom: 50,
     },
 
-    elevation: 1,
-  },
+    // ==========================================================
+    // SUMMARY
+    // ==========================================================
 
-  expenseCardLast: {
-    marginBottom: 0,
-  },
-
-  expenseIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 14,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    marginRight: 11,
-  },
-
-  expenseMain: {
-    flex: 1,
-    minWidth: 0,
-  },
-
-  expenseTopRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-
-  expenseCategory: {
-    flex: 1,
-
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-
-  expenseAmount: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: colors.textPrimary,
-  },
-
-  expenseMetaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: 5,
-    gap: 8,
-  },
-
-  dateContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-  },
-
-  expenseDate: {
-    fontSize: 10,
-    color: colors.textFaint,
-  },
-
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-
-    borderRadius: 7,
-  },
-
-  paidBadge: {
-    backgroundColor: "#ecfdf5",
-  },
-
-  pendingBadge: {
-    backgroundColor: "#fffbeb",
-  },
-
-  statusDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 3,
-  },
-
-  paidDot: {
-    backgroundColor: "#10b981",
-  },
-
-  pendingDot: {
-    backgroundColor: "#f59e0b",
-  },
-
-  statusText: {
-    fontSize: 7,
-    fontWeight: "800",
-  },
-
-  paidText: {
-    color: "#059669",
-  },
-
-  pendingText: {
-    color: "#d97706",
-  },
-
-  commentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-
-    marginTop: 5,
-
-    paddingRight: 4,
-  },
-
-  expenseComment: {
-    flex: 1,
-
-    fontSize: 9,
-    color: colors.textSecondary,
-  },
-
-  // ==========================================================
-  // ACTIONS
-  // ==========================================================
-
-  actionColumn: {
-    marginLeft: 8,
-
-    alignItems: "center",
-
-    gap: 6,
-  },
-
-  editButton: {
-    width: 29,
-    height: 29,
-
-    borderRadius: 9,
-
-    backgroundColor: "#f8fafc",
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    borderWidth: 1,
-    borderColor: "#eef2f7",
-  },
-
-  deleteButton: {
-    backgroundColor: "#fff7f7",
-    borderColor: "#fee2e2",
-  },
-
-  // ==========================================================
-  // EMPTY
-  // ==========================================================
-
-  emptyCard: {
-    backgroundColor: "#fff",
-
-    borderRadius: 18,
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    paddingVertical: 38,
-
-    borderWidth: 1,
-    borderColor: "#f1f5f9",
-  },
-
-  emptyIcon: {
-    width: 52,
-    height: 52,
-
-    borderRadius: 18,
-
-    backgroundColor: "#f1f5f9",
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    marginBottom: 10,
-  },
-
-  emptyTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.textPrimary,
-  },
-
-  emptySubtitle: {
-    fontSize: 11,
-    color: colors.textFaint,
-    marginTop: 4,
-  },
-
-  // ==========================================================
-  // PERIOD PICKER OVERLAY
-  // ==========================================================
-
-  periodOverlay: {
-    flex: 1,
-
-    backgroundColor: "rgba(15,23,42,0.48)",
-
-    justifyContent: "center",
-
-    padding: 20,
-  },
-
-  periodModal: {
-    backgroundColor: "#fff",
-
-    borderRadius: 23,
-
-    padding: 18,
-
-    maxHeight: "82%",
-
-    shadowColor: "#000",
-    shadowOpacity: 0.12,
-    shadowRadius: 25,
-
-    shadowOffset: {
-      width: 0,
-      height: 10,
+    summaryGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+      gap: 11,
+      marginBottom: 14,
     },
 
-    elevation: 8,
-  },
+    summaryCard: {
+      width: "48.2%",
+      backgroundColor: colors.card,
 
-  periodModalHeader: {
-    flexDirection: "row",
+      borderRadius: 18,
 
-    justifyContent: "space-between",
+      padding: 15,
 
-    alignItems: "center",
+      shadowColor: "#000",
+      shadowOpacity: 0.045,
+      shadowRadius: 10,
 
-    marginBottom: 15,
-  },
+      shadowOffset: {
+        width: 0,
+        height: 3,
+      },
 
-  periodHeaderLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
+      elevation: 2,
 
-  periodHeaderIcon: {
-    width: 39,
-    height: 39,
-
-    borderRadius: 12,
-
-    backgroundColor: "#eff6ff",
-
-    alignItems: "center",
-    justifyContent: "center",
-
-    marginRight: 10,
-  },
-
-  periodModalTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: colors.textPrimary,
-  },
-
-  periodModalSubtitle: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 3,
-  },
-
-  closeButton: {
-    width: 35,
-    height: 35,
-
-    borderRadius: 18,
-
-    backgroundColor: "#f1f5f9",
-
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  closeText: {
-    fontSize: 25,
-    lineHeight: 27,
-    color: colors.textSecondary,
-  },
-
-  // ==========================================================
-  // PERIOD TABS
-  // ==========================================================
-
-  periodTabs: {
-    flexDirection: "row",
-
-    backgroundColor: "#f8fafc",
-
-    borderRadius: 12,
-
-    padding: 3,
-
-    marginBottom: 15,
-  },
-
-  periodTab: {
-    flex: 1,
-
-    height: 38,
-
-    borderRadius: 9,
-
-    alignItems: "center",
-    justifyContent: "center",
-  },
-
-  periodTabActive: {
-    backgroundColor: "#fff",
-
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-
-    shadowOffset: {
-      width: 0,
-      height: 2,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
 
-    elevation: 1,
-  },
+    summaryCardTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
 
-  periodTabText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
+    summaryLabel: {
+      fontSize: 12,
+      fontWeight: "400",
+      color: colors.textSecondary,
+    },
 
-  periodTabTextActive: {
-    color: colors.primaryBlue,
-    fontWeight: "800",
-  },
+    summaryIcon: {
+      width: 29,
+      height: 29,
+      borderRadius: 10,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-  // ==========================================================
-  // YEAR GRID
-  // ==========================================================
+    summaryValue: {
+      fontSize: 22,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      marginTop: 10,
+    },
 
-  yearScroll: {
-    maxHeight: 390,
-  },
+    // ==========================================================
+    // OVERVIEW
+    // ==========================================================
 
-  yearGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 9,
+    overviewCard: {
+      backgroundColor: colors.card,
 
-    paddingBottom: 3,
-  },
+      borderRadius: 20,
 
-  yearItem: {
-    width: "31.8%",
+      padding: 16,
 
-    minHeight: 46,
+      marginBottom: 20,
 
-    borderRadius: 12,
+      shadowColor: "#000",
+      shadowOpacity: 0.045,
+      shadowRadius: 12,
 
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+      shadowOffset: {
+        width: 0,
+        height: 4,
+      },
 
-    alignItems: "center",
-    justifyContent: "center",
+      elevation: 2,
 
-    flexDirection: "row",
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
 
-    gap: 5,
-  },
+    overviewHeader: {
+      flexDirection: "row",
 
-  yearItemActive: {
-    backgroundColor: "#eff6ff",
-    borderColor: colors.primaryBlue,
-  },
+      justifyContent: "space-between",
 
-  yearItemText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
+      alignItems: "center",
 
-  yearItemTextActive: {
-    color: colors.primaryBlue,
-    fontWeight: "800",
-  },
+      marginBottom: 10,
+    },
 
-  yearCheck: {
-    width: 16,
-    height: 16,
+    overviewTitleArea: {
+      flex: 1,
 
-    borderRadius: 8,
+      paddingRight: 8,
+    },
 
-    backgroundColor: colors.primaryBlue,
+    chartTitle: {
+      fontSize: 16,
 
-    alignItems: "center",
-    justifyContent: "center",
-  },
+      fontWeight: "700",
 
-  // ==========================================================
-  // MONTH GRID
-  // ==========================================================
+      color: colors.textPrimary,
+    },
 
-  monthGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 9,
-  },
+    chartSubtitle: {
+      fontSize: 12,
 
-  monthItem: {
-    width: "31.8%",
+      color: colors.textSecondary,
 
-    minHeight: 48,
+      marginTop: 3,
+    },
 
-    borderRadius: 13,
+    periodSelector: {
+      flexDirection: "row",
 
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+      alignItems: "center",
 
-    flexDirection: "row",
+      gap: 7,
 
-    alignItems: "center",
-    justifyContent: "center",
+      paddingHorizontal: 9,
 
-    gap: 6,
-  },
+      paddingVertical: 8,
 
-  monthItemActive: {
-    backgroundColor: "#eff6ff",
+      borderRadius: 12,
 
-    borderColor: colors.primaryBlue,
-  },
+      backgroundColor: colors.statBlueBg,
+    },
 
-  monthItemLocked: {
-    backgroundColor: "#f8fafc",
+    calendarIconBox: {
+      width: 25,
 
-    borderColor: "#f1f5f9",
-  },
+      height: 25,
 
-  monthItemText: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
+      borderRadius: 8,
 
-  monthItemTextActive: {
-    color: colors.primaryBlue,
-    fontWeight: "800",
-  },
+      backgroundColor: colors.card,
 
-  monthItemTextLocked: {
-    color: "#cbd5e1",
-    fontWeight: "600",
-  },
+      alignItems: "center",
 
-  monthCheck: {
-    alignItems: "center",
-    justifyContent: "center",
-  },
+      justifyContent: "center",
+    },
 
-  // ==========================================================
-  // PERIOD FOOTER
-  // ==========================================================
+    periodSelectorText: {
+      fontSize: 11,
 
-  periodFooter: {
-    flexDirection: "row",
-    alignItems: "center",
+      fontWeight: "800",
 
-    gap: 6,
+      color: colors.primaryBlue,
+    },
 
-    marginTop: 15,
+    periodSelectorHint: {
+      fontSize: 8,
 
-    paddingTop: 12,
+      color: colors.textSecondary,
 
-    borderTopWidth: 1,
-    borderTopColor: "#f1f5f9",
-  },
+      marginTop: 1,
+    },
 
-  periodFooterText: {
-    flex: 1,
+    chartLoading: {
+      height: 270,
 
-    fontSize: 10,
+      alignItems: "center",
 
-    color: colors.textFaint,
+      justifyContent: "center",
+    },
 
-    lineHeight: 15,
-  },
-});
+    // ==========================================================
+    // DONUT
+    // ==========================================================
+
+    donutSection: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      minHeight: 210,
+    },
+
+    donutWrap: {
+      width: 180,
+
+      height: 180,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    donutCenter: {
+      position: "absolute",
+
+      width: 110,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    donutCenterIcon: {
+      width: 24,
+
+      height: 24,
+
+      borderRadius: 8,
+
+      backgroundColor: colors.successBg,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      marginBottom: 4,
+    },
+
+    donutCenterAmount: {
+      fontSize: 16,
+
+      fontWeight: "800",
+
+      color: colors.textPrimary,
+
+      textAlign: "center",
+    },
+
+    donutCenterLabel: {
+      fontSize: 7,
+
+      fontWeight: "800",
+
+      color: colors.textFaint,
+
+      marginTop: 3,
+
+      textAlign: "center",
+
+      letterSpacing: 0.3,
+    },
+
+    donutEmpty: {
+      width: 180,
+
+      height: 180,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    emptyDonutRing: {
+      width: 150,
+
+      height: 150,
+
+      borderRadius: 75,
+
+      borderWidth: 25,
+
+      borderColor: colors.borderLight,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    donutEmptyAmount: {
+      fontSize: 14,
+
+      fontWeight: "800",
+
+      color: colors.textPrimary,
+
+      marginTop: 5,
+    },
+
+    // ==========================================================
+    // BREAKDOWN
+    // ==========================================================
+
+    breakdownList: {
+      flex: 1,
+
+      marginLeft: 7,
+
+      gap: 10,
+
+      minWidth: 0,
+    },
+
+    breakdownRow: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      minWidth: 0,
+    },
+
+    breakdownDot: {
+      width: 8,
+
+      height: 8,
+
+      borderRadius: 4,
+
+      marginRight: 7,
+    },
+
+    breakdownNameWrap: {
+      flex: 1,
+
+      minWidth: 0,
+    },
+
+    breakdownName: {
+      fontSize: 11,
+
+      fontWeight: "600",
+
+      color: colors.textSecondary,
+    },
+
+    breakdownPercent: {
+      width: 31,
+
+      fontSize: 10,
+
+      fontWeight: "700",
+
+      color: colors.textPrimary,
+
+      textAlign: "right",
+    },
+
+    profitPercent: {
+      color: colors.success,
+
+      fontWeight: "800",
+    },
+
+    breakdownAmount: {
+      width: 62,
+
+      fontSize: 10,
+
+      fontWeight: "700",
+
+      color: colors.textPrimary,
+
+      textAlign: "right",
+    },
+
+    profitAmount: {
+      color: colors.success,
+
+      fontWeight: "800",
+    },
+
+    noBreakdownBox: {
+      alignItems: "flex-start",
+
+      gap: 7,
+    },
+
+    noBreakdown: {
+      fontSize: 11,
+
+      color: colors.textFaint,
+
+      lineHeight: 17,
+    },
+
+    // ==========================================================
+    // FINANCE STRIP
+    // ==========================================================
+
+    financeStrip: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      backgroundColor: colors.borderLight,
+
+      borderRadius: 14,
+
+      paddingVertical: 12,
+
+      paddingHorizontal: 14,
+
+      marginTop: 6,
+    },
+
+    financeItem: {
+      flex: 1,
+    },
+
+    financeDivider: {
+      width: 1,
+
+      height: 43,
+
+      backgroundColor: colors.border,
+
+      marginHorizontal: 14,
+    },
+
+    financeLabelRow: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 5,
+
+      marginBottom: 3,
+    },
+
+    financeMiniDot: {
+      width: 5,
+
+      height: 5,
+
+      borderRadius: 3,
+    },
+
+    financeLabel: {
+      fontSize: 10,
+
+      color: colors.textFaint,
+    },
+
+    financeExpense: {
+      fontSize: 15,
+
+      fontWeight: "700",
+
+      color: colors.danger,
+    },
+
+    financeRevenue: {
+      fontSize: 15,
+
+      fontWeight: "700",
+
+      color: colors.success,
+    },
+
+    financeProfit: {
+      fontSize: 15,
+
+      fontWeight: "700",
+
+      color: colors.success,
+    },
+
+    financeLoss: {
+      fontSize: 15,
+
+      fontWeight: "700",
+
+      color: colors.danger,
+    },
+
+    financePercentage: {
+      fontSize: 8,
+
+      color: colors.textFaint,
+
+      marginTop: 2,
+    },
+
+    financeLossPercentage: {
+      fontSize: 8,
+
+      color: colors.danger,
+
+      marginTop: 2,
+
+      fontWeight: "600",
+    },
+
+    // ==========================================================
+    // PROFIT MESSAGE
+    // ==========================================================
+
+    profitMessage: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      marginTop: 10,
+
+      paddingHorizontal: 11,
+
+      paddingVertical: 9,
+
+      borderRadius: 12,
+
+      backgroundColor: colors.successBg,
+
+      borderWidth: 1,
+
+      borderColor: colors.border,
+    },
+
+    profitMessageIcon: {
+      width: 27,
+
+      height: 27,
+
+      borderRadius: 9,
+
+      backgroundColor: colors.successBg,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      marginRight: 8,
+    },
+
+    profitMessageTextWrap: {
+      flex: 1,
+    },
+
+    profitMessageTitle: {
+      fontSize: 10,
+
+      fontWeight: "800",
+
+      color: colors.success,
+    },
+
+    profitMessageSubtitle: {
+      fontSize: 8,
+
+      color: colors.textSecondary,
+
+      marginTop: 2,
+    },
+
+    profitMessageAmount: {
+      fontSize: 12,
+
+      fontWeight: "800",
+
+      color: colors.success,
+    },
+
+    // ==========================================================
+    // SECTION
+    // ==========================================================
+
+    sectionHeader: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      justifyContent: "space-between",
+
+      marginBottom: 11,
+    },
+
+    sectionTitleArea: {
+      flex: 1,
+    },
+
+    sectionTitle: {
+      fontSize: 16,
+
+      fontWeight: "700",
+
+      color: colors.textPrimary,
+    },
+
+    sectionSubtitle: {
+      fontSize: 12,
+
+      color: colors.textSecondary,
+
+      marginTop: 3,
+    },
+
+    addButton: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 6,
+
+      backgroundColor: colors.primaryBlue,
+
+      paddingHorizontal: 13,
+
+      paddingVertical: 10,
+
+      borderRadius: 12,
+
+      shadowColor: colors.primaryBlue,
+
+      shadowOpacity: 0.18,
+
+      shadowRadius: 7,
+
+      shadowOffset: {
+        width: 0,
+        height: 3,
+      },
+
+      elevation: 2,
+    },
+
+    addButtonText: {
+      color: "#fff",
+
+      fontSize: 12,
+
+      fontWeight: "700",
+    },
+
+    // ==========================================================
+    // EXPENSE CARD
+    // ==========================================================
+
+    expenseCard: {
+      backgroundColor: colors.card,
+
+      borderRadius: 17,
+
+      paddingVertical: 12,
+
+      paddingHorizontal: 11,
+
+      marginBottom: 9,
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      borderWidth: 1,
+
+      borderColor: colors.borderLight,
+
+      shadowColor: "#000",
+
+      shadowOpacity: 0.035,
+
+      shadowRadius: 8,
+
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+
+      elevation: 1,
+    },
+
+    expenseCardLast: {
+      marginBottom: 0,
+    },
+
+    expenseIcon: {
+      width: 46,
+
+      height: 46,
+
+      borderRadius: 14,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      marginRight: 11,
+    },
+
+    expenseMain: {
+      flex: 1,
+
+      minWidth: 0,
+    },
+
+    expenseTopRow: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      justifyContent: "space-between",
+
+      gap: 8,
+    },
+
+    expenseCategory: {
+      flex: 1,
+
+      fontSize: 13,
+
+      fontWeight: "700",
+
+      color: colors.textPrimary,
+    },
+
+    expenseAmount: {
+      fontSize: 14,
+
+      fontWeight: "800",
+
+      color: colors.textPrimary,
+    },
+
+    expenseMetaRow: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      marginTop: 5,
+
+      gap: 8,
+    },
+
+    dateContainer: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 5,
+    },
+
+    expenseDate: {
+      fontSize: 10,
+
+      color: colors.textFaint,
+    },
+
+    statusBadge: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 4,
+
+      paddingHorizontal: 7,
+
+      paddingVertical: 3,
+
+      borderRadius: 7,
+    },
+
+    paidBadge: {
+      backgroundColor: colors.successBg,
+    },
+
+    pendingBadge: {
+      backgroundColor: colors.warningBg,
+    },
+
+    statusDot: {
+      width: 5,
+
+      height: 5,
+
+      borderRadius: 3,
+    },
+
+    paidDot: {
+      backgroundColor: colors.success,
+    },
+
+    pendingDot: {
+      backgroundColor: colors.warning,
+    },
+
+    statusText: {
+      fontSize: 7,
+
+      fontWeight: "800",
+    },
+
+    paidText: {
+      color: colors.success,
+    },
+
+    pendingText: {
+      color: colors.warning,
+    },
+
+    commentRow: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 5,
+
+      marginTop: 5,
+
+      paddingRight: 4,
+    },
+
+    expenseComment: {
+      flex: 1,
+
+      fontSize: 9,
+
+      color: colors.textSecondary,
+    },
+
+    // ==========================================================
+    // ACTIONS
+    // ==========================================================
+
+    actionColumn: {
+      marginLeft: 8,
+
+      alignItems: "center",
+
+      gap: 6,
+    },
+
+    editButton: {
+      width: 29,
+
+      height: 29,
+
+      borderRadius: 9,
+
+      backgroundColor: colors.borderLight,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      borderWidth: 1,
+
+      borderColor: colors.border,
+    },
+
+    deleteButton: {
+      backgroundColor: colors.dangerBg,
+
+      borderColor: colors.border,
+    },
+
+    // ==========================================================
+    // EMPTY
+    // ==========================================================
+
+    emptyCard: {
+      backgroundColor: colors.card,
+
+      borderRadius: 18,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      paddingVertical: 38,
+
+      borderWidth: 1,
+
+      borderColor: colors.borderLight,
+    },
+
+    emptyIcon: {
+      width: 52,
+
+      height: 52,
+
+      borderRadius: 18,
+
+      backgroundColor: colors.borderLight,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      marginBottom: 10,
+    },
+
+    emptyTitle: {
+      fontSize: 14,
+
+      fontWeight: "700",
+
+      color: colors.textPrimary,
+    },
+
+    emptySubtitle: {
+      fontSize: 11,
+
+      color: colors.textFaint,
+
+      marginTop: 4,
+    },
+
+    // ==========================================================
+    // PERIOD PICKER OVERLAY
+    // ==========================================================
+
+    periodOverlay: {
+      flex: 1,
+
+      backgroundColor: "rgba(15,23,42,0.48)",
+
+      justifyContent: "center",
+
+      padding: 20,
+    },
+
+    periodModal: {
+      backgroundColor: colors.card,
+
+      borderRadius: 23,
+
+      padding: 18,
+
+      maxHeight: "82%",
+
+      shadowColor: "#000",
+
+      shadowOpacity: 0.12,
+
+      shadowRadius: 25,
+
+      shadowOffset: {
+        width: 0,
+        height: 10,
+      },
+
+      elevation: 8,
+
+      borderWidth: 1,
+
+      borderColor: colors.border,
+    },
+
+    periodModalHeader: {
+      flexDirection: "row",
+
+      justifyContent: "space-between",
+
+      alignItems: "center",
+
+      marginBottom: 15,
+    },
+
+    periodHeaderLeft: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      flex: 1,
+    },
+
+    periodHeaderIcon: {
+      width: 39,
+
+      height: 39,
+
+      borderRadius: 12,
+
+      backgroundColor: colors.statBlueBg,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      marginRight: 10,
+    },
+
+    periodModalTitle: {
+      fontSize: 19,
+
+      fontWeight: "800",
+
+      color: colors.textPrimary,
+    },
+
+    periodModalSubtitle: {
+      fontSize: 11,
+
+      color: colors.textSecondary,
+
+      marginTop: 3,
+    },
+
+    closeButton: {
+      width: 35,
+
+      height: 35,
+
+      borderRadius: 18,
+
+      backgroundColor: colors.borderLight,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    closeText: {
+      fontSize: 25,
+
+      lineHeight: 27,
+
+      color: colors.textSecondary,
+    },
+
+    // ==========================================================
+    // PERIOD TABS
+    // ==========================================================
+
+    periodTabs: {
+      flexDirection: "row",
+
+      backgroundColor: colors.borderLight,
+
+      borderRadius: 12,
+
+      padding: 3,
+
+      marginBottom: 15,
+    },
+
+    periodTab: {
+      flex: 1,
+
+      height: 38,
+
+      borderRadius: 9,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    periodTabActive: {
+      backgroundColor: colors.card,
+
+      shadowColor: "#000",
+
+      shadowOpacity: 0.05,
+
+      shadowRadius: 5,
+
+      shadowOffset: {
+        width: 0,
+        height: 2,
+      },
+
+      elevation: 1,
+    },
+
+    periodTabText: {
+      fontSize: 12,
+
+      fontWeight: "600",
+
+      color: colors.textSecondary,
+    },
+
+    periodTabTextActive: {
+      color: colors.primaryBlue,
+
+      fontWeight: "800",
+    },
+
+    // ==========================================================
+    // YEAR GRID
+    // ==========================================================
+
+    yearScroll: {
+      maxHeight: 390,
+    },
+
+    yearGrid: {
+      flexDirection: "row",
+
+      flexWrap: "wrap",
+
+      gap: 9,
+
+      paddingBottom: 3,
+    },
+
+    yearItem: {
+      width: "31.8%",
+
+      minHeight: 46,
+
+      borderRadius: 12,
+
+      borderWidth: 1,
+
+      borderColor: colors.border,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      flexDirection: "row",
+
+      gap: 5,
+    },
+
+    yearItemActive: {
+      backgroundColor: colors.statBlueBg,
+
+      borderColor: colors.primaryBlue,
+    },
+
+    yearItemText: {
+      fontSize: 12,
+
+      fontWeight: "600",
+
+      color: colors.textSecondary,
+    },
+
+    yearItemTextActive: {
+      color: colors.primaryBlue,
+
+      fontWeight: "800",
+    },
+
+    yearCheck: {
+      width: 16,
+
+      height: 16,
+
+      borderRadius: 8,
+
+      backgroundColor: colors.primaryBlue,
+
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    // ==========================================================
+    // MONTH GRID
+    // ==========================================================
+
+    monthGrid: {
+      flexDirection: "row",
+
+      flexWrap: "wrap",
+
+      gap: 9,
+    },
+
+    monthItem: {
+      width: "31.8%",
+
+      minHeight: 48,
+
+      borderRadius: 13,
+
+      borderWidth: 1,
+
+      borderColor: colors.border,
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      justifyContent: "center",
+
+      gap: 6,
+    },
+
+    monthItemActive: {
+      backgroundColor: colors.statBlueBg,
+
+      borderColor: colors.primaryBlue,
+    },
+
+    monthItemLocked: {
+      backgroundColor: colors.borderLight,
+
+      borderColor: colors.borderLight,
+    },
+
+    monthItemText: {
+      fontSize: 12,
+
+      fontWeight: "600",
+
+      color: colors.textSecondary,
+    },
+
+    monthItemTextActive: {
+      color: colors.primaryBlue,
+
+      fontWeight: "800",
+    },
+
+    monthItemTextLocked: {
+      color: colors.textFaint,
+
+      fontWeight: "600",
+    },
+
+    monthCheck: {
+      alignItems: "center",
+
+      justifyContent: "center",
+    },
+
+    // ==========================================================
+    // PERIOD FOOTER
+    // ==========================================================
+
+    periodFooter: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 6,
+
+      marginTop: 15,
+
+      paddingTop: 12,
+
+      borderTopWidth: 1,
+
+      borderTopColor: colors.borderLight,
+    },
+
+    periodFooterText: {
+      flex: 1,
+
+      fontSize: 10,
+
+      color: colors.textFaint,
+
+      lineHeight: 15,
+    },
+    // ==========================================================
+    // PERIOD FOOTER
+    // ==========================================================
+
+    periodFooter: {
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      gap: 6,
+
+      marginTop: 15,
+
+      paddingTop: 12,
+
+      borderTopWidth: 1,
+
+      borderTopColor: colors.borderLight,
+    },
+
+    periodFooterText: {
+      flex: 1,
+
+      fontSize: 10,
+
+      color: colors.textFaint,
+
+      lineHeight: 15,
+    },
+  });
+}

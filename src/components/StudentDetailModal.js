@@ -11,6 +11,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  useWindowDimensions,
 } from "react-native";
 
 import { FontAwesome6 } from "@expo/vector-icons";
@@ -36,12 +37,11 @@ export default function StudentDetailModal({
   const { isDarkMode } = useTheme();
 
   const colors = isDarkMode ? darkColors : lightColors;
+  const { width } = useWindowDimensions();
 
-  // ==========================================================
-  // DYNAMIC STYLES
-  // ==========================================================
+  const isDesktopWeb = Platform.OS === "web" && width >= 1024;
 
-  const styles = createStyles(colors);
+  const styles = createStyles(colors, isDesktopWeb);
 
   // ==========================================================
   // STATE
@@ -371,156 +371,165 @@ export default function StudentDetailModal({
                   STUDENT NAME
               ================================================= */}
 
-              <Text style={styles.label}>Student Name</Text>
+              <View style={styles.desktopFieldRow}>
+                <View style={styles.desktopField}>
+                  <Text style={styles.label}>Student Name</Text>
 
-              <TextInput
-                value={name}
-                onChangeText={setName}
-                style={styles.input}
-                placeholder="Enter student name"
-                placeholderTextColor={colors.textMuted}
-                editable={!loading}
-              />
+                  <TextInput
+                    value={name}
+                    onChangeText={setName}
+                    style={styles.input}
+                    placeholder="Enter student name"
+                    placeholderTextColor={colors.textMuted}
+                    editable={!loading}
+                  />
+                </View>
 
-              {/* =================================================
-                  PHONE
-              ================================================= */}
+                <View style={styles.desktopField}>
+                  <Text style={styles.label}>Phone Number</Text>
 
-              <Text style={styles.label}>Phone Number</Text>
-
-              <TextInput
-                value={phone}
-                onChangeText={setPhone}
-                style={styles.input}
-                placeholder="Enter phone number"
-                placeholderTextColor={colors.textMuted}
-                keyboardType="phone-pad"
-                editable={!loading}
-              />
+                  <TextInput
+                    value={phone}
+                    onChangeText={setPhone}
+                    style={styles.input}
+                    placeholder="Enter phone number"
+                    placeholderTextColor={colors.textMuted}
+                    keyboardType="phone-pad"
+                    editable={!loading}
+                  />
+                </View>
+              </View>
 
               {/* =================================================
                   JOINING DATE
               ================================================= */}
 
-              <Text style={styles.label}>Joining Date</Text>
+              <View style={styles.desktopFieldRow}>
+                {/* JOINING DATE */}
 
-              <View style={[styles.input, styles.readOnlyInput]}>
-                <Text style={styles.readOnlyText}>
-                  {formatDate(joiningDate)}
-                </Text>
-              </View>
+                <View style={styles.desktopField}>
+                  <Text style={styles.label}>Joining Date</Text>
 
-              {/* =================================================
-                  EXPIRY DATE
-              ================================================= */}
-
-              <Text style={styles.label}>Expiry Date</Text>
-
-              <TouchableOpacity
-                style={styles.input}
-                onPress={() => {
-                  console.log("📅 Expiry date clicked");
-
-                  setDatePickerVisible(true);
-                }}
-                disabled={loading}
-                activeOpacity={0.7}
-              >
-                <View
-                  style={{
-                    flex: 1,
-                    flexDirection: "row",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                  }}
-                >
-                  <Text
-                    style={{
-                      fontSize: 16,
-                      color: colors.textPrimary,
-                      fontWeight: "500",
-                    }}
-                  >
-                    {formatDisplayDate(expiryDate)}
-                  </Text>
-
-                  <FontAwesome6
-                    name="calendar-days"
-                    size={18}
-                    color={colors.primaryBlue}
-                  />
+                  <View style={[styles.input, styles.readOnlyInput]}>
+                    <Text style={styles.readOnlyText}>
+                      {formatDate(joiningDate)}
+                    </Text>
+                  </View>
                 </View>
-              </TouchableOpacity>
+
+                {/* EXPIRY DATE */}
+
+                <View style={styles.desktopField}>
+                  <Text style={styles.label}>Expiry Date</Text>
+
+                  <TouchableOpacity
+                    style={styles.input}
+                    onPress={() => {
+                      console.log("📅 Expiry date clicked");
+
+                      setDatePickerVisible(true);
+                    }}
+                    disabled={loading}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.dateInputContent}>
+                      <Text style={styles.dateInputText}>
+                        {formatDisplayDate(expiryDate)}
+                      </Text>
+
+                      <FontAwesome6
+                        name="calendar-days"
+                        size={16}
+                        color={colors.primaryBlue}
+                      />
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </View>
 
               {/* =================================================
                   AMOUNT
               ================================================= */}
 
-              <Text style={styles.label}>Amount Paid</Text>
+              <View style={styles.desktopFieldRow}>
+                <View style={styles.desktopField}>
+                  <Text style={styles.label}>Amount Paid</Text>
 
-              <View style={styles.amountContainer}>
-                <Text style={styles.rupee}>₹</Text>
+                  <View style={styles.amountContainer}>
+                    <Text style={styles.rupee}>₹</Text>
 
-                <TextInput
-                  value={amountPaid}
-                  onChangeText={setAmountPaid}
-                  style={styles.amountInput}
-                  placeholder="700"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="numeric"
-                  editable={!loading}
-                />
+                    <TextInput
+                      value={amountPaid}
+                      onChangeText={setAmountPaid}
+                      style={styles.amountInput}
+                      placeholder="700"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      editable={!loading}
+                    />
+                  </View>
+                </View>
+
+                {/* Empty space on desktop */}
+                <View style={styles.desktopField} />
               </View>
 
               {/* =================================================
                   UPDATE
               ================================================= */}
 
-              <TouchableOpacity
-                style={[styles.updateButton, loading && styles.disabledButton]}
-                onPress={handleUpdate}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <FontAwesome6
-                      name="floppy-disk"
-                      size={16}
-                      color="#FFFFFF"
-                    />
+              <View style={styles.desktopActionRow}>
+                {/* UPDATE */}
 
-                    <Text style={styles.updateButtonText}>Update Student</Text>
-                  </>
-                )}
-              </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.updateButton,
+                    loading && styles.disabledButton,
+                  ]}
+                  onPress={handleUpdate}
+                  disabled={loading}
+                >
+                  {loading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <>
+                      <FontAwesome6
+                        name="floppy-disk"
+                        size={15}
+                        color="#FFFFFF"
+                      />
 
-              {/* =================================================
-                  VACATE
-              ================================================= */}
+                      <Text style={styles.updateButtonText}>
+                        Update Student
+                      </Text>
+                    </>
+                  )}
+                </TouchableOpacity>
 
-              <TouchableOpacity
-                style={[
-                  styles.vacateButton,
-                  loading && styles.disabledVacateButton,
-                ]}
-                onPress={() => {
-                  if (
-                    currentSeatNumber === null ||
-                    currentSeatNumber === undefined
-                  ) {
-                    return;
-                  }
+                {/* VACATE */}
 
-                  onVacate(currentSeatNumber);
-                }}
-                disabled={loading}
-              >
-                <FontAwesome6 name="chair" size={16} color={colors.danger} />
+                <TouchableOpacity
+                  style={[
+                    styles.vacateButton,
+                    loading && styles.disabledVacateButton,
+                  ]}
+                  onPress={() => {
+                    if (
+                      currentSeatNumber === null ||
+                      currentSeatNumber === undefined
+                    ) {
+                      return;
+                    }
 
-                <Text style={styles.vacateButtonText}>Vacate Seat</Text>
-              </TouchableOpacity>
+                    onVacate(currentSeatNumber);
+                  }}
+                  disabled={loading}
+                >
+                  <FontAwesome6 name="chair" size={15} color={colors.danger} />
+
+                  <Text style={styles.vacateButtonText}>Vacate Seat</Text>
+                </TouchableOpacity>
+              </View>
 
               {/* =================================================
                   CANCEL
@@ -710,29 +719,78 @@ export default function StudentDetailModal({
 
                   {/* DATE PICKER */}
 
-                  <View style={styles.datePickerWrapper}>
-                    <DateTimePicker
-                      value={expiryDate || new Date()}
-                      mode="date"
-                      display="spinner"
-                      minimumDate={new Date()}
-                      themeVariant={isDarkMode ? "dark" : "light"}
-                      textColor={colors.textPrimary}
-                      onChange={(event, selectedDate) => {
-                        console.log("📅 Date picker event:", event.type);
+                  {/* ==================================================
+    DATE PICKER
+================================================== */}
 
-                        if (selectedDate) {
-                          console.log("📅 Selected expiry date:", selectedDate);
+                  <View style={styles.datePickerWrapper}>
+                    {isDesktopWeb ? (
+                      <input
+                        type="date"
+                        value={formatDateForInput(expiryDate)}
+                        min={formatDateForInput(new Date())}
+                        onChange={(event) => {
+                          const value = event.target.value;
+
+                          if (!value) {
+                            return;
+                          }
+
+                          const [year, month, day] = value
+                            .split("-")
+                            .map(Number);
+
+                          const selectedDate = new Date(year, month - 1, day);
+
+                          console.log(
+                            "📅 Desktop expiry date selected:",
+                            selectedDate
+                          );
 
                           setExpiryDate(selectedDate);
-                        }
+                        }}
+                        style={{
+                          width: "100%",
+                          height: 52,
+                          padding: "0 14px",
+                          borderRadius: 12,
+                          border: `1px solid ${colors.border}`,
+                          backgroundColor: colors.card,
+                          color: colors.textPrimary,
+                          fontSize: 16,
+                          fontWeight: "600",
+                          outline: "none",
+                          boxSizing: "border-box",
+                          colorScheme: isDarkMode ? "dark" : "light",
+                        }}
+                      />
+                    ) : (
+                      <DateTimePicker
+                        value={expiryDate || new Date()}
+                        mode="date"
+                        display="spinner"
+                        minimumDate={new Date()}
+                        themeVariant={isDarkMode ? "dark" : "light"}
+                        textColor={colors.textPrimary}
+                        onChange={(event, selectedDate) => {
+                          console.log("📅 Date picker event:", event.type);
 
-                        if (Platform.OS === "android") {
-                          setDatePickerVisible(false);
-                        }
-                      }}
-                      style={styles.datePicker}
-                    />
+                          if (selectedDate) {
+                            console.log(
+                              "📅 Selected expiry date:",
+                              selectedDate
+                            );
+
+                            setExpiryDate(selectedDate);
+                          }
+
+                          if (Platform.OS === "android") {
+                            setDatePickerVisible(false);
+                          }
+                        }}
+                        style={styles.datePicker}
+                      />
+                    )}
                   </View>
 
                   {/* SELECTED DATE PREVIEW */}
@@ -773,8 +831,21 @@ export default function StudentDetailModal({
     </>
   );
 }
+function formatDateForInput(date) {
+  if (!(date instanceof Date) || isNaN(date.getTime())) {
+    return "";
+  }
 
-function createStyles(colors) {
+  const year = date.getFullYear();
+
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+function createStyles(colors, isDesktopWeb) {
   return StyleSheet.create({
     // ==========================================================
     // MAIN MODAL
@@ -782,40 +853,62 @@ function createStyles(colors) {
 
     overlay: {
       flex: 1,
+
       backgroundColor: "rgba(0,0,0,0.48)",
+
       justifyContent: "center",
       alignItems: "center",
-      paddingHorizontal: 18,
+
+      paddingHorizontal: isDesktopWeb ? 24 : 18,
+      paddingVertical: isDesktopWeb ? 24 : 0,
     },
 
     modalContainer: {
-      width: "100%",
-      maxHeight: "90%",
+      width: isDesktopWeb ? 780 : "100%",
+
+      maxWidth: isDesktopWeb ? 820 : undefined,
+
+      maxHeight: isDesktopWeb ? "88%" : "90%",
+
       backgroundColor: colors.card,
-      borderRadius: 28,
+
+      borderRadius: isDesktopWeb ? 22 : 28,
+
       overflow: "hidden",
 
+      borderWidth: isDesktopWeb ? 1 : 0,
+
+      borderColor: colors.border,
+
       shadowColor: "#000",
-      shadowOpacity: 0.18,
-      shadowRadius: 20,
+
+      shadowOpacity: isDesktopWeb ? 0.28 : 0.18,
+
+      shadowRadius: isDesktopWeb ? 28 : 20,
+
       shadowOffset: {
         width: 0,
-        height: 10,
+        height: isDesktopWeb ? 14 : 10,
       },
 
-      elevation: 10,
+      elevation: isDesktopWeb ? 14 : 10,
     },
 
     header: {
-      paddingHorizontal: 22,
-      paddingTop: 22,
-      paddingBottom: 16,
+      paddingHorizontal: isDesktopWeb ? 24 : 22,
+
+      paddingTop: isDesktopWeb ? 18 : 22,
+
+      paddingBottom: isDesktopWeb ? 14 : 16,
 
       flexDirection: "row",
+
       alignItems: "center",
+
       justifyContent: "space-between",
 
       borderBottomWidth: 1,
+
       borderBottomColor: colors.borderLight,
     },
 
@@ -824,26 +917,34 @@ function createStyles(colors) {
     },
 
     title: {
-      fontSize: 24,
+      fontSize: isDesktopWeb ? 21 : 24,
+
       fontWeight: "800",
+
       color: colors.textPrimary,
     },
 
     subtitle: {
-      marginTop: 4,
-      fontSize: 14,
+      marginTop: 3,
+
+      fontSize: isDesktopWeb ? 12 : 14,
+
       fontWeight: "600",
+
       color: colors.primaryBlue,
     },
 
     closeButton: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: isDesktopWeb ? 36 : 38,
+
+      height: isDesktopWeb ? 36 : 38,
+
+      borderRadius: isDesktopWeb ? 18 : 19,
 
       backgroundColor: colors.borderLight,
 
       alignItems: "center",
+
       justifyContent: "center",
     },
 
@@ -858,27 +959,33 @@ function createStyles(colors) {
     // ==========================================================
 
     label: {
-      fontSize: 14,
+      fontSize: isDesktopWeb ? 12 : 14,
+
       fontWeight: "600",
+
       color: colors.textSecondary,
-      marginTop: 16,
-      marginBottom: 7,
+
+      marginTop: isDesktopWeb ? 12 : 16,
+
+      marginBottom: isDesktopWeb ? 6 : 7,
     },
 
     // ==========================================================
     // INPUTS
     // ==========================================================
-
     input: {
-      height: 52,
+      height: isDesktopWeb ? 46 : 52,
 
       borderWidth: 1,
+
       borderColor: colors.border,
-      borderRadius: 14,
 
-      paddingHorizontal: 15,
+      borderRadius: isDesktopWeb ? 11 : 14,
 
-      fontSize: 16,
+      paddingHorizontal: isDesktopWeb ? 13 : 15,
+
+      fontSize: isDesktopWeb ? 14 : 16,
+
       color: colors.textPrimary,
 
       backgroundColor: colors.card,
@@ -951,30 +1058,38 @@ function createStyles(colors) {
     // ==========================================================
 
     amountContainer: {
-      height: 52,
+      height: isDesktopWeb ? 46 : 52,
 
       borderWidth: 1,
+
       borderColor: colors.border,
-      borderRadius: 14,
+
+      borderRadius: isDesktopWeb ? 11 : 14,
 
       flexDirection: "row",
+
       alignItems: "center",
 
-      paddingHorizontal: 15,
+      paddingHorizontal: isDesktopWeb ? 13 : 15,
 
       backgroundColor: colors.card,
     },
 
     rupee: {
-      fontSize: 18,
+      fontSize: isDesktopWeb ? 16 : 18,
+
       fontWeight: "700",
+
       color: colors.textSecondary,
+
       marginRight: 8,
     },
 
     amountInput: {
       flex: 1,
-      fontSize: 16,
+
+      fontSize: isDesktopWeb ? 14 : 16,
+
       color: colors.textPrimary,
     },
 
@@ -983,23 +1098,30 @@ function createStyles(colors) {
     // ==========================================================
 
     updateButton: {
-      height: 54,
-      borderRadius: 16,
+      height: isDesktopWeb ? 48 : 54,
+
+      flex: isDesktopWeb ? 1 : undefined,
+
+      borderRadius: isDesktopWeb ? 12 : 16,
 
       backgroundColor: colors.primaryBlue,
 
       flexDirection: "row",
+
       alignItems: "center",
+
       justifyContent: "center",
 
       gap: 9,
 
-      marginTop: 24,
+      marginTop: isDesktopWeb ? 0 : 24,
     },
 
     updateButtonText: {
       color: "#FFFFFF",
-      fontSize: 16,
+
+      fontSize: isDesktopWeb ? 14 : 16,
+
       fontWeight: "700",
     },
 
@@ -1008,26 +1130,34 @@ function createStyles(colors) {
     },
 
     vacateButton: {
-      height: 52,
-      borderRadius: 16,
+      height: isDesktopWeb ? 48 : 52,
+
+      flex: isDesktopWeb ? 1 : undefined,
+
+      borderRadius: isDesktopWeb ? 12 : 16,
 
       borderWidth: 1,
+
       borderColor: colors.danger,
 
       backgroundColor: colors.dangerBg,
 
       flexDirection: "row",
+
       alignItems: "center",
+
       justifyContent: "center",
 
       gap: 8,
 
-      marginTop: 12,
+      marginTop: isDesktopWeb ? 0 : 12,
     },
 
     vacateButtonText: {
       color: colors.danger,
-      fontSize: 16,
+
+      fontSize: isDesktopWeb ? 14 : 16,
+
       fontWeight: "700",
     },
 
@@ -1036,17 +1166,20 @@ function createStyles(colors) {
     },
 
     cancelButton: {
-      height: 50,
+      height: isDesktopWeb ? 38 : 50,
 
       alignItems: "center",
+
       justifyContent: "center",
 
-      marginTop: 4,
+      marginTop: isDesktopWeb ? 2 : 4,
     },
 
     cancelText: {
       color: colors.primaryBlue,
-      fontSize: 16,
+
+      fontSize: isDesktopWeb ? 13 : 16,
+
       fontWeight: "600",
     },
 
@@ -1307,15 +1440,23 @@ function createStyles(colors) {
     },
 
     datePickerContainer: {
-      width: "100%",
+      width: isDesktopWeb ? 520 : "100%",
+
+      maxWidth: isDesktopWeb ? 520 : undefined,
 
       backgroundColor: colors.card,
 
-      borderRadius: 26,
+      borderRadius: isDesktopWeb ? 20 : 26,
 
-      paddingHorizontal: 20,
-      paddingTop: 22,
-      paddingBottom: 20,
+      paddingHorizontal: isDesktopWeb ? 24 : 20,
+
+      paddingTop: isDesktopWeb ? 20 : 22,
+
+      paddingBottom: isDesktopWeb ? 20 : 20,
+
+      borderWidth: isDesktopWeb ? 1 : 0,
+
+      borderColor: colors.border,
     },
 
     datePickerHeader: {
@@ -1346,9 +1487,10 @@ function createStyles(colors) {
     datePickerWrapper: {
       width: "100%",
 
-      height: 220,
+      height: isDesktopWeb ? 52 : 220,
 
       alignItems: "center",
+
       justifyContent: "center",
 
       overflow: "hidden",
@@ -1360,20 +1502,21 @@ function createStyles(colors) {
     },
 
     selectedDatePreview: {
-      height: 48,
+      height: isDesktopWeb ? 44 : 48,
 
-      borderRadius: 12,
+      borderRadius: isDesktopWeb ? 10 : 12,
 
       backgroundColor: isDarkColors(colors) ? "#1E3A5F" : "#EFF6FF",
 
       flexDirection: "row",
 
       alignItems: "center",
+
       justifyContent: "center",
 
       gap: 9,
 
-      marginBottom: 14,
+      marginBottom: isDesktopWeb ? 12 : 14,
     },
 
     selectedDateText: {
@@ -1385,22 +1528,60 @@ function createStyles(colors) {
     },
 
     dateDoneButton: {
-      height: 54,
+      height: isDesktopWeb ? 46 : 54,
 
-      borderRadius: 16,
+      borderRadius: isDesktopWeb ? 12 : 16,
 
       backgroundColor: colors.primaryBlue,
 
       alignItems: "center",
+
       justifyContent: "center",
     },
 
     dateDoneButtonText: {
       color: "#FFFFFF",
 
-      fontSize: 17,
+      fontSize: isDesktopWeb ? 14 : 17,
 
       fontWeight: "700",
+    },
+    desktopFieldRow: {
+      flexDirection: isDesktopWeb ? "row" : "column",
+
+      gap: isDesktopWeb ? 14 : 0,
+    },
+
+    desktopField: {
+      flex: isDesktopWeb ? 1 : undefined,
+
+      width: isDesktopWeb ? undefined : "100%",
+    },
+
+    dateInputContent: {
+      flex: 1,
+
+      flexDirection: "row",
+
+      alignItems: "center",
+
+      justifyContent: "space-between",
+    },
+
+    dateInputText: {
+      fontSize: isDesktopWeb ? 14 : 16,
+
+      color: colors.textPrimary,
+
+      fontWeight: "500",
+    },
+
+    desktopActionRow: {
+      flexDirection: isDesktopWeb ? "row" : "column",
+
+      gap: isDesktopWeb ? 12 : 0,
+
+      marginTop: isDesktopWeb ? 18 : 24,
     },
   });
 }

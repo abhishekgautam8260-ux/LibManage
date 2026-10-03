@@ -1,5 +1,13 @@
 import React from "react";
-import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
+
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Platform,
+  useWindowDimensions,
+} from "react-native";
 
 import { useTheme } from "../context/ThemeContext";
 import { lightColors, darkColors } from "../theme/colors";
@@ -14,10 +22,21 @@ export default function SeatGrid({
 
   const colors = isDarkMode ? darkColors : lightColors;
 
-  const styles = createStyles(colors);
+  const { width } = useWindowDimensions();
+
+  /*
+   * IMPORTANT
+   *
+   * Desktop styling is ONLY enabled on web.
+   *
+   * Android/iOS remain exactly the same.
+   */
+  const isDesktop = Platform.OS === "web" && width >= 1024;
+
+  const styles = createStyles(colors, isDesktop);
 
   // ============================================================
-  // SORT SEATS
+  // SORT
   // ============================================================
 
   const sortedSeats = [...seats].sort((a, b) => a.seatNumber - b.seatNumber);
@@ -43,18 +62,7 @@ export default function SeatGrid({
 
     const held = !!seat.held;
 
-    /*
-     * IMPORTANT:
-     *
-     * A seat cannot visually be both booked and held.
-     *
-     * Occupied always takes priority.
-     */
     const status = occupied ? "occupied" : held ? "held" : "vacant";
-
-    // ==========================================================
-    // PRESS HANDLER
-    // ==========================================================
 
     const handlePress = () => {
       if (status === "occupied") {
@@ -78,40 +86,23 @@ export default function SeatGrid({
       }
     };
 
-    // ==========================================================
-    // COLORS
-    // ==========================================================
-
     let backgroundColor;
     let borderColor;
     let textColor;
 
     if (status === "occupied") {
       backgroundColor = colors.seatOccupied;
-
       borderColor = colors.seatBorder;
-
       textColor = colors.textSecondary;
     } else if (status === "held") {
-      /*
-       * Orange = temporary seat hold
-       */
       backgroundColor = colors.warningBg;
-
       borderColor = colors.warning;
-
       textColor = colors.warning;
     } else {
       backgroundColor = colors.seatVacant;
-
       borderColor = colors.seatBorder;
-
       textColor = colors.textPrimary;
     }
-
-    // ==========================================================
-    // SEAT
-    // ==========================================================
 
     return (
       <TouchableOpacity
@@ -126,8 +117,6 @@ export default function SeatGrid({
           },
         ]}
       >
-        {/* SEAT NUMBER */}
-
         <Text
           style={[
             styles.seatNumber,
@@ -138,8 +127,6 @@ export default function SeatGrid({
         >
           {seatNumber}
         </Text>
-
-        {/* STATUS */}
 
         {status === "occupied" && (
           <Text
@@ -206,11 +193,6 @@ export default function SeatGrid({
   return (
     <View style={styles.container}>
       {rows.map((row, rowIndex) => {
-        /*
-         * Preserve your existing zig-zag layout.
-         *
-         * Odd rows are reversed.
-         */
         const displayRow = rowIndex % 2 === 1 ? [...row].reverse() : row;
 
         return (
@@ -227,52 +209,68 @@ export default function SeatGrid({
 // STYLES
 // ============================================================
 
-const createStyles = (colors) =>
+const createStyles = (colors, isDesktop) =>
   StyleSheet.create({
     container: {
       width: "100%",
-      paddingVertical: 8,
+
+      paddingVertical: isDesktop ? 4 : 8,
+
+      alignItems: "center",
     },
 
     row: {
       flexDirection: "row",
       justifyContent: "center",
       alignItems: "center",
-      marginBottom: 10,
-      gap: 8,
+
+      marginBottom: isDesktop ? 13 : 10,
+
+      gap: isDesktop ? 12 : 8,
     },
 
     seat: {
-      width: 58,
-      minHeight: 62,
+      width: isDesktop ? 78 : 58,
 
-      borderWidth: 1.5,
-      borderRadius: 12,
+      minHeight: isDesktop ? 78 : 62,
+
+      borderWidth: isDesktop ? 1.5 : 1.5,
+
+      borderRadius: isDesktop ? 14 : 12,
 
       justifyContent: "center",
       alignItems: "center",
 
-      paddingVertical: 7,
+      paddingVertical: isDesktop ? 9 : 7,
+
       paddingHorizontal: 4,
     },
 
     seatNumber: {
-      fontSize: 17,
+      fontSize: isDesktop ? 21 : 17,
+
       fontWeight: "800",
-      lineHeight: 20,
+
+      lineHeight: isDesktop ? 24 : 20,
     },
 
     statusText: {
-      fontSize: 7,
+      fontSize: isDesktop ? 8 : 7,
+
       fontWeight: "800",
-      marginTop: 2,
-      letterSpacing: 0.3,
+
+      marginTop: 3,
+
+      letterSpacing: 0.4,
     },
 
     holdName: {
-      maxWidth: 48,
-      fontSize: 7,
+      maxWidth: isDesktop ? 65 : 48,
+
+      fontSize: isDesktop ? 8 : 7,
+
       fontWeight: "600",
-      marginTop: 1,
+
+      marginTop: 2,
     },
   });

@@ -11,6 +11,8 @@ import {
   Modal,
   Pressable,
   ScrollView,
+  Platform,
+  useWindowDimensions,
 } from "react-native";
 
 import { useFocusEffect } from "@react-navigation/native";
@@ -19,6 +21,7 @@ import Svg, { G, Circle } from "react-native-svg";
 
 import Header from "../components/Header";
 import ExpenseModal from "../components/ExpenseModal";
+import DesktopLayout from "../components/DesktopLayout";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -183,12 +186,25 @@ export default function BillingScreen() {
   const { isDarkMode } = useTheme();
 
   // ==========================================================
+  // RESPONSIVE LAYOUT
+  // ==========================================================
+
+  const { width } = useWindowDimensions();
+
+  const isDesktop = Platform.OS === "web" && width >= 1000;
+
+  // ==========================================================
   // THEME
   // ==========================================================
 
   const colors = isDarkMode ? darkColors : lightColors;
 
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const desktopStyles = useMemo(
+    () => createDesktopBillingStyles(colors),
+    [colors]
+  );
 
   // ==========================================================
   // DATE
@@ -415,9 +431,9 @@ export default function BillingScreen() {
       );
   }, [expenses, selectedYear, selectedMonth]);
 
-  // ============================================================
+  // ==========================================================
   // CATEGORY + PROFIT BREAKDOWN
-  // ============================================================
+  // ==========================================================
 
   const categoryBreakdown = useMemo(() => {
     const map = {};
@@ -450,6 +466,7 @@ export default function BillingScreen() {
 
         info: {
           icon: "chart-line",
+
           emoji: "📈",
 
           color: isDarkMode ? "#4ADE80" : "#10b981",
@@ -472,9 +489,9 @@ export default function BillingScreen() {
     colors.successBg,
   ]);
 
-  // ============================================================
+  // ==========================================================
   // SAVE EXPENSE
-  // ============================================================
+  // ==========================================================
 
   const handleSave = async (payload) => {
     if (!payload.amount || Number(payload.amount) <= 0) {
@@ -508,7 +525,6 @@ export default function BillingScreen() {
 
       Alert.alert(
         editing ? "Expense Updated" : "Expense Added",
-
         editing
           ? "Expense has been updated successfully."
           : "Expense has been added successfully."
@@ -527,16 +543,70 @@ export default function BillingScreen() {
     }
   };
 
-  // ============================================================
+  // ==========================================================
   // DELETE EXPENSE
-  // ============================================================
+  // ==========================================================
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
+    console.log("🗑️ Delete expense clicked:", id);
+
+    if (!id) {
+      console.error("❌ Delete failed: expense ID is missing");
+      return;
+    }
+
+    if (!libraryId) {
+      console.error("❌ Delete failed: libraryId is missing");
+      return;
+    }
+
+    // ============================================================
+    // DESKTOP WEB
+    // ============================================================
+
+    if (Platform.OS === "web") {
+      const confirmed = window.confirm(
+        "Delete Expense?\n\nThis expense will be permanently removed."
+      );
+
+      if (!confirmed) {
+        console.log("ℹ️ Expense deletion cancelled");
+        return;
+      }
+
+      try {
+        console.log("🚀 Deleting expense:", {
+          id,
+          libraryId,
+        });
+
+        await deleteExpense(id, libraryId);
+
+        console.log("✅ Expense deleted successfully:", id);
+
+        await loadExpenses();
+
+        await loadSummary(selectedYear, selectedMonth);
+      } catch (error) {
+        console.error("❌ Delete expense failed:", error);
+
+        window.alert(
+          error?.response?.data?.message ||
+            error?.message ||
+            "Unable to delete expense."
+        );
+      }
+
+      return;
+    }
+
+    // ============================================================
+    // MOBILE
+    // ============================================================
+
     Alert.alert(
       "Delete Expense?",
-
       "This expense will be permanently removed.",
-
       [
         {
           text: "Cancel",
@@ -549,13 +619,20 @@ export default function BillingScreen() {
 
           onPress: async () => {
             try {
+              console.log("🚀 Deleting expense:", {
+                id,
+                libraryId,
+              });
+
               await deleteExpense(id, libraryId);
+
+              console.log("✅ Expense deleted successfully:", id);
 
               await loadExpenses();
 
               await loadSummary(selectedYear, selectedMonth);
             } catch (error) {
-              console.error("Delete expense failed:", error);
+              console.error("❌ Delete expense failed:", error);
 
               Alert.alert(
                 "Delete Failed",
@@ -570,9 +647,9 @@ export default function BillingScreen() {
     );
   };
 
-  // ============================================================
+  // ==========================================================
   // OPEN ADD EXPENSE
-  // ============================================================
+  // ==========================================================
 
   const openAddExpense = () => {
     setEditing(null);
@@ -580,9 +657,9 @@ export default function BillingScreen() {
     setModalVisible(true);
   };
 
-  // ============================================================
+  // ==========================================================
   // OPEN EDIT EXPENSE
-  // ============================================================
+  // ==========================================================
 
   const openEditExpense = (item) => {
     setEditing(item);
@@ -590,13 +667,29 @@ export default function BillingScreen() {
     setModalVisible(true);
   };
 
-  // ============================================================
+  // ==========================================================
   // LOADING
-  // ============================================================
+  // ==========================================================
 
   if (loading) {
+    if (isDesktop) {
+      return (
+        <DesktopLayout
+          activeRoute="Billing"
+          title="Billing"
+          subtitle="Track your library finances"
+        >
+          <View style={desktopStyles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primaryBlue} />
+
+            <Text style={desktopStyles.loadingText}>Loading billing...</Text>
+          </View>
+        </DesktopLayout>
+      );
+    }
+
     return (
-      <View style={styles.center}>
+      <View style={styles.loadingScreen}>
         <ActivityIndicator size="large" color={colors.primaryBlue} />
 
         <Text style={styles.loadingText}>Loading billing...</Text>
@@ -604,20 +697,75 @@ export default function BillingScreen() {
     );
   }
 
-  // ============================================================
-  // SCREEN
-  // ============================================================
+  // ==========================================================
+  // DESKTOP SCREEN
+  // ==========================================================
+
+  if (isDesktop) {
+    return (
+      <DesktopLayout
+        activeRoute="Billing"
+        title="Billing"
+        subtitle="Track your library finances"
+      >
+        <DesktopBillingContent
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          selectedMonthName={selectedMonthName}
+          monthlyRevenue={monthlyRevenue}
+          monthlyExpenses={monthlyExpenses}
+          monthlyProfit={monthlyProfit}
+          averageProfit={averageProfit}
+          monthlyExpensesList={monthlyExpensesList}
+          categoryBreakdown={categoryBreakdown}
+          monthLoading={monthLoading}
+          isDarkMode={isDarkMode}
+          colors={colors}
+          styles={desktopStyles}
+          onMonthPress={() => setMonthPickerVisible(true)}
+          onAddExpense={openAddExpense}
+          onEditExpense={openEditExpense}
+          onDeleteExpense={handleDelete}
+        />
+
+        <ExpenseModal
+          visible={modalVisible}
+          initial={editing}
+          loading={saving}
+          onClose={() => {
+            if (saving) return;
+
+            setModalVisible(false);
+
+            setEditing(null);
+          }}
+          onSave={handleSave}
+        />
+
+        <BillingPeriodPicker
+          visible={monthPickerVisible}
+          selectedMonth={selectedMonth}
+          selectedYear={selectedYear}
+          currentYear={currentYear}
+          currentMonth={currentMonth}
+          onSelectMonth={changeMonth}
+          onSelectYear={changeYear}
+          onClose={() => setMonthPickerVisible(false)}
+          styles={styles}
+          colors={colors}
+          isDarkMode={isDarkMode}
+        />
+      </DesktopLayout>
+    );
+  }
+
+  // ==========================================================
+  // MOBILE SCREEN
+  // ==========================================================
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          backgroundColor: colors.bg,
-        },
-      ]}
-    >
-      <Header title="Billing" />
+    <View style={styles.container}>
+      <Header />
 
       <FlatList
         data={monthlyExpensesList}
@@ -625,9 +773,37 @@ export default function BillingScreen() {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         ListHeaderComponent={
-          <View>
+          <>
             {/* ==================================================
-                SUMMARY
+                BILLING PERIOD
+            ================================================== */}
+
+            <View style={styles.mobilePeriodRow}>
+              <View>
+                <Text style={styles.mobilePeriodLabel}>Billing</Text>
+
+                <Text style={styles.mobilePeriodTitle}>
+                  {selectedMonthName} {selectedYear}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                style={styles.mobilePeriodButton}
+                activeOpacity={0.8}
+                onPress={() => setMonthPickerVisible(true)}
+              >
+                <FontAwesome6
+                  name="calendar-days"
+                  size={14}
+                  color={colors.primaryBlue}
+                />
+
+                <Text style={styles.mobilePeriodButtonText}>Change</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* ==================================================
+                SUMMARY CARDS
             ================================================== */}
 
             <View style={styles.summaryGrid}>
@@ -650,13 +826,11 @@ export default function BillingScreen() {
               />
 
               <SummaryCard
-                label="Net Profit"
+                label="Profit"
                 value={monthlyProfit}
                 icon="chart-line"
                 iconBg={isDarkMode ? colors.statBlueBg : "#eff6ff"}
-                iconColor={
-                  monthlyProfit >= 0 ? colors.primaryBlue : colors.danger
-                }
+                iconColor={colors.primaryBlue}
                 styles={styles}
               />
 
@@ -682,157 +856,55 @@ export default function BillingScreen() {
               totalExpenses={monthlyExpenses}
               revenue={monthlyRevenue}
               profit={monthlyProfit}
-              onMonthPress={() => setMonthPickerVisible(true)}
               styles={styles}
               colors={colors}
               isDarkMode={isDarkMode}
+              onMonthPress={() => setMonthPickerVisible(true)}
             />
 
             {/* ==================================================
                 EXPENSE HEADER
             ================================================== */}
 
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleArea}>
-                <Text style={styles.sectionTitle}>Expenses</Text>
+            <View style={styles.expensesSectionHeader}>
+              <View style={styles.expensesHeaderText}>
+                <Text style={styles.expensesTitle}>Expenses</Text>
 
-                <Text style={styles.sectionSubtitle}>
+                <Text style={styles.expensesSubtitle}>
                   {monthlyExpensesList.length} transaction
-                  {monthlyExpensesList.length === 1 ? "" : "s"} in{" "}
-                  {selectedMonthName}
+                  {monthlyExpensesList.length === 1 ? "" : "s"}
                 </Text>
               </View>
 
               <TouchableOpacity
+                style={styles.sectionAddButton}
                 activeOpacity={0.8}
-                style={styles.addButton}
                 onPress={openAddExpense}
               >
                 <FontAwesome6 name="plus" size={11} color="#fff" />
 
-                <Text style={styles.addButtonText}>Add Expense</Text>
+                <Text style={styles.sectionAddButtonText}>Add Expense</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </>
         }
-        ListEmptyComponent={<EmptyExpenses styles={styles} colors={colors} />}
-        renderItem={({ item, index }) => {
-          const info = getCategoryInfo(item.category, isDarkMode);
-
-          const isPaid = String(item.status || "PAID").toUpperCase() === "PAID";
-
-          return (
-            <View
-              style={[
-                styles.expenseCard,
-                index === monthlyExpensesList.length - 1 &&
-                  styles.expenseCardLast,
-              ]}
-            >
-              {/* LEFT ICON */}
-
-              <View
-                style={[
-                  styles.expenseIcon,
-                  {
-                    backgroundColor: info.bg,
-                  },
-                ]}
-              >
-                <FontAwesome6 name={info.icon} size={17} color={info.color} />
-              </View>
-
-              {/* MAIN DETAILS */}
-
-              <View style={styles.expenseMain}>
-                <View style={styles.expenseTopRow}>
-                  <Text style={styles.expenseCategory} numberOfLines={1}>
-                    {item.category || "Other"}
-                  </Text>
-
-                  <Text style={styles.expenseAmount}>
-                    {formatMoney(item.amount)}
-                  </Text>
-                </View>
-
-                <View style={styles.expenseMetaRow}>
-                  <View style={styles.dateContainer}>
-                    <FontAwesome6
-                      name="calendar-days"
-                      size={9}
-                      color={colors.textFaint}
-                    />
-
-                    <Text style={styles.expenseDate}>
-                      {formatDate(item.expenseDate)}
-                    </Text>
-                  </View>
-
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      isPaid ? styles.paidBadge : styles.pendingBadge,
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.statusDot,
-                        isPaid ? styles.paidDot : styles.pendingDot,
-                      ]}
-                    />
-
-                    <Text
-                      style={[
-                        styles.statusText,
-                        isPaid ? styles.paidText : styles.pendingText,
-                      ]}
-                    >
-                      {isPaid ? "PAID" : "PENDING"}
-                    </Text>
-                  </View>
-                </View>
-
-                {!!item.comment && (
-                  <View style={styles.commentRow}>
-                    <FontAwesome6
-                      name="message"
-                      size={8}
-                      color={colors.textFaint}
-                    />
-
-                    <Text style={styles.expenseComment} numberOfLines={1}>
-                      {item.comment}
-                    </Text>
-                  </View>
-                )}
-              </View>
-
-              {/* ACTIONS */}
-
-              <View style={styles.actionColumn}>
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={styles.editButton}
-                  onPress={() => openEditExpense(item)}
-                >
-                  <FontAwesome6
-                    name="pen"
-                    size={10}
-                    color={colors.textSecondary}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  activeOpacity={0.7}
-                  style={[styles.editButton, styles.deleteButton]}
-                  onPress={() => handleDelete(item.id)}
-                >
-                  <FontAwesome6 name="trash" size={10} color={colors.danger} />
-                </TouchableOpacity>
-              </View>
-            </View>
-          );
-        }}
+        renderItem={({ item }) => (
+          <ExpenseRow
+            item={item}
+            styles={styles}
+            colors={colors}
+            isDarkMode={isDarkMode}
+            onEdit={openEditExpense}
+            onDelete={handleDelete}
+          />
+        )}
+        ListEmptyComponent={
+          <EmptyExpenses
+            styles={styles}
+            colors={colors}
+            onAddExpense={openAddExpense}
+          />
+        }
       />
 
       {/* ========================================================
@@ -854,7 +926,7 @@ export default function BillingScreen() {
       />
 
       {/* ========================================================
-          MONTH / YEAR PICKER
+          BILLING PERIOD PICKER
       ======================================================== */}
 
       <BillingPeriodPicker
@@ -900,9 +972,620 @@ function SummaryCard({ label, value, icon, iconBg, iconColor, styles }) {
     </View>
   );
 }
+// ============================================================
+// DESKTOP BILLING CONTENT
+// ============================================================
+
+function DesktopBillingContent({
+  selectedMonth,
+  selectedYear,
+  selectedMonthName,
+  monthlyRevenue,
+  monthlyExpenses,
+  monthlyProfit,
+  averageProfit,
+  monthlyExpensesList,
+  categoryBreakdown,
+  monthLoading,
+  isDarkMode,
+  colors,
+  styles,
+  onMonthPress,
+  onAddExpense,
+  onEditExpense,
+  onDeleteExpense,
+}) {
+  return (
+    <ScrollView
+      style={styles.scroll}
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      {/* ======================================================
+          PERIOD TOOLBAR
+      ====================================================== */}
+
+      <View style={styles.periodToolbar}>
+        <View>
+          <Text style={styles.periodLabel}>Billing Period</Text>
+
+          <Text style={styles.periodDescription}>
+            View revenue, expenses and profit for a specific month.
+          </Text>
+        </View>
+
+        <View style={styles.periodActions}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.periodButton}
+            onPress={onMonthPress}
+          >
+            <FontAwesome6
+              name="calendar-days"
+              size={14}
+              color={colors.primaryBlue}
+            />
+
+            <Text style={styles.periodButtonText}>
+              {selectedMonthName} {selectedYear}
+            </Text>
+
+            <FontAwesome6
+              name="chevron-down"
+              size={10}
+              color={colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.addExpenseButton}
+            onPress={onAddExpense}
+          >
+            <FontAwesome6 name="plus" size={12} color="#fff" />
+
+            <Text style={styles.addExpenseButtonText}>Add Expense</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ======================================================
+          SUMMARY CARDS
+      ====================================================== */}
+
+      <View style={styles.summaryGrid}>
+        <DesktopBillingSummaryCard
+          label="Revenue"
+          value={monthlyRevenue}
+          icon="money-bill-wave"
+          iconColor={isDarkMode ? "#4ADE80" : "#10b981"}
+          iconBg={isDarkMode ? colors.successBg : "#ecfdf5"}
+          styles={styles}
+        />
+
+        <DesktopBillingSummaryCard
+          label="Expenses"
+          value={monthlyExpenses}
+          icon="arrow-trend-down"
+          iconColor={isDarkMode ? "#F87171" : "#ef4444"}
+          iconBg={isDarkMode ? colors.dangerBg : "#fef2f2"}
+          styles={styles}
+        />
+
+        <DesktopBillingSummaryCard
+          label="Net Profit"
+          value={monthlyProfit}
+          icon="chart-line"
+          iconColor={monthlyProfit >= 0 ? colors.primaryBlue : colors.danger}
+          iconBg={isDarkMode ? colors.statBlueBg : "#eff6ff"}
+          styles={styles}
+        />
+
+        <DesktopBillingSummaryCard
+          label="Avg. Profit"
+          value={averageProfit}
+          icon="chart-pie"
+          iconColor={isDarkMode ? "#A78BFA" : "#8b5cf6"}
+          iconBg={isDarkMode ? colors.statPurpleBg : "#f5f3ff"}
+          styles={styles}
+        />
+      </View>
+
+      {/* ======================================================
+          FINANCIAL OVERVIEW
+      ====================================================== */}
+
+      <DesktopFinancialOverview
+        monthName={selectedMonthName}
+        year={selectedYear}
+        loading={monthLoading}
+        breakdown={categoryBreakdown}
+        totalExpenses={monthlyExpenses}
+        revenue={monthlyRevenue}
+        profit={monthlyProfit}
+        onMonthPress={onMonthPress}
+        colors={colors}
+        styles={styles}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* ======================================================
+          EXPENSES
+      ====================================================== */}
+
+      <View style={styles.expensesSection}>
+        <View style={styles.expensesSectionHeader}>
+          <View style={styles.expensesHeaderText}>
+            <Text style={styles.expensesTitle}>Expenses</Text>
+
+            <Text style={styles.expensesSubtitle}>
+              {monthlyExpensesList.length} transaction
+              {monthlyExpensesList.length === 1 ? "" : "s"} in{" "}
+              {selectedMonthName}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={styles.sectionAddButton}
+            onPress={onAddExpense}
+          >
+            <FontAwesome6 name="plus" size={11} color="#fff" />
+
+            <Text style={styles.sectionAddButtonText}>Add Expense</Text>
+          </TouchableOpacity>
+        </View>
+
+        {monthlyExpensesList.length === 0 ? (
+          <DesktopEmptyExpenses colors={colors} styles={styles} />
+        ) : (
+          <View style={styles.expenseTable}>
+            {/* ==================================================
+                TABLE HEADER
+            ================================================== */}
+
+            <View style={styles.expenseTableHeader}>
+              <Text style={[styles.tableHeaderText, styles.categoryColumn]}>
+                Category
+              </Text>
+
+              <Text style={[styles.tableHeaderText, styles.dateColumn]}>
+                Date
+              </Text>
+
+              <Text style={[styles.tableHeaderText, styles.statusColumn]}>
+                Status
+              </Text>
+
+              <Text style={[styles.tableHeaderText, styles.commentColumn]}>
+                Comment
+              </Text>
+
+              <Text style={[styles.tableHeaderText, styles.amountColumn]}>
+                Amount
+              </Text>
+
+              <Text style={[styles.tableHeaderText, styles.actionColumn]}>
+                Actions
+              </Text>
+            </View>
+
+            {/* ==================================================
+                TABLE ROWS
+            ================================================== */}
+
+            {monthlyExpensesList.map((item, index) => {
+              const info = getCategoryInfo(item.category, isDarkMode);
+
+              const isPaid =
+                String(item.status || "PAID").toUpperCase() === "PAID";
+
+              return (
+                <View
+                  key={String(item.id)}
+                  style={[
+                    styles.expenseTableRow,
+
+                    index === monthlyExpensesList.length - 1 &&
+                      styles.expenseTableRowLast,
+                  ]}
+                >
+                  {/* CATEGORY */}
+
+                  <View style={styles.categoryCell}>
+                    <View
+                      style={[
+                        styles.categoryIcon,
+                        {
+                          backgroundColor: info.bg,
+                        },
+                      ]}
+                    >
+                      <FontAwesome6
+                        name={info.icon}
+                        size={14}
+                        color={info.color}
+                      />
+                    </View>
+
+                    <Text style={styles.categoryText} numberOfLines={1}>
+                      {item.category || "Other"}
+                    </Text>
+                  </View>
+
+                  {/* DATE */}
+
+                  <View style={styles.dateCell}>
+                    <FontAwesome6
+                      name="calendar-days"
+                      size={11}
+                      color={colors.textFaint}
+                    />
+
+                    <Text style={styles.dateText}>
+                      {formatDate(item.expenseDate)}
+                    </Text>
+                  </View>
+
+                  {/* STATUS */}
+
+                  <View style={styles.statusCell}>
+                    <View
+                      style={[
+                        styles.desktopStatusBadge,
+
+                        isPaid
+                          ? styles.desktopPaidBadge
+                          : styles.desktopPendingBadge,
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.desktopStatusDot,
+
+                          isPaid
+                            ? styles.desktopPaidDot
+                            : styles.desktopPendingDot,
+                        ]}
+                      />
+
+                      <Text
+                        style={[
+                          styles.desktopStatusText,
+
+                          isPaid
+                            ? styles.desktopPaidText
+                            : styles.desktopPendingText,
+                        ]}
+                      >
+                        {isPaid ? "PAID" : "PENDING"}
+                      </Text>
+                    </View>
+                  </View>
+
+                  {/* COMMENT */}
+
+                  <View style={styles.commentCell}>
+                    {item.comment ? (
+                      <>
+                        <FontAwesome6
+                          name="message"
+                          size={9}
+                          color={colors.textFaint}
+                        />
+
+                        <Text style={styles.commentText} numberOfLines={1}>
+                          {item.comment}
+                        </Text>
+                      </>
+                    ) : (
+                      <Text style={styles.noCommentText}>—</Text>
+                    )}
+                  </View>
+
+                  {/* AMOUNT */}
+
+                  <View style={styles.amountCell}>
+                    <Text style={styles.amountText}>
+                      {formatMoney(item.amount)}
+                    </Text>
+                  </View>
+
+                  {/* ACTIONS */}
+
+                  <View style={styles.actionsCell}>
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={styles.tableActionButton}
+                      onPress={() => onEditExpense(item)}
+                    >
+                      <FontAwesome6
+                        name="pen"
+                        size={10}
+                        color={colors.textSecondary}
+                      />
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      activeOpacity={0.7}
+                      style={[
+                        styles.tableActionButton,
+                        styles.tableDeleteButton,
+                      ]}
+                      onPress={() => {
+                        console.log("🗑️ DELETE BUTTON PRESSED:", item.id);
+
+                        onDeleteExpense(item.id);
+                      }}
+                    >
+                      <FontAwesome6
+                        name="trash"
+                        size={10}
+                        color={colors.danger}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              );
+            })}
+          </View>
+        )}
+      </View>
+    </ScrollView>
+  );
+}
 
 // ============================================================
-// FINANCIAL OVERVIEW
+// DESKTOP SUMMARY CARD
+// ============================================================
+
+function DesktopBillingSummaryCard({
+  label,
+  value,
+  icon,
+  iconBg,
+  iconColor,
+  styles,
+}) {
+  return (
+    <View style={styles.desktopSummaryCard}>
+      <View style={styles.desktopSummaryTop}>
+        <View>
+          <Text style={styles.desktopSummaryLabel}>{label}</Text>
+
+          <Text style={styles.desktopSummaryValue}>{formatMoney(value)}</Text>
+        </View>
+
+        <View
+          style={[
+            styles.desktopSummaryIcon,
+            {
+              backgroundColor: iconBg,
+            },
+          ]}
+        >
+          <FontAwesome6 name={icon} size={16} color={iconColor} />
+        </View>
+      </View>
+    </View>
+  );
+}
+
+// ============================================================
+// DESKTOP FINANCIAL OVERVIEW
+// ============================================================
+
+function DesktopFinancialOverview({
+  monthName,
+  year,
+  loading,
+  breakdown,
+  totalExpenses,
+  revenue,
+  profit,
+  onMonthPress,
+  colors,
+  styles,
+  isDarkMode,
+}) {
+  const chartTotal = profit >= 0 ? revenue : totalExpenses;
+
+  const profitPercentage =
+    revenue > 0 && profit > 0 ? (profit / revenue) * 100 : 0;
+
+  const expensePercentage = revenue > 0 ? (totalExpenses / revenue) * 100 : 0;
+
+  return (
+    <View style={styles.desktopOverviewCard}>
+      <View style={styles.desktopOverviewHeader}>
+        <View>
+          <Text style={styles.desktopOverviewTitle}>Expense vs Profit</Text>
+
+          <Text style={styles.desktopOverviewSubtitle}>
+            Overall financial overview
+          </Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.desktopPeriodButton}
+          onPress={onMonthPress}
+          activeOpacity={0.8}
+        >
+          <FontAwesome6
+            name="calendar-days"
+            size={13}
+            color={colors.primaryBlue}
+          />
+
+          <Text style={styles.desktopPeriodButtonText}>
+            {monthName.slice(0, 3)} {year}
+          </Text>
+
+          <FontAwesome6
+            name="chevron-down"
+            size={9}
+            color={colors.textSecondary}
+          />
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <View style={styles.desktopChartLoading}>
+          <ActivityIndicator size="small" color={colors.primaryBlue} />
+        </View>
+      ) : (
+        <>
+          <View style={styles.desktopOverviewBody}>
+            <DonutChart
+              data={breakdown}
+              total={chartTotal}
+              revenue={revenue}
+              profit={profit}
+              styles={styles}
+              colors={colors}
+              isDarkMode={isDarkMode}
+            />
+
+            <View style={styles.desktopBreakdownList}>
+              {breakdown.length === 0 ? (
+                <View style={styles.desktopNoData}>
+                  <FontAwesome6
+                    name="receipt"
+                    size={18}
+                    color={colors.textFaint}
+                  />
+
+                  <Text style={styles.desktopNoDataText}>
+                    No financial data available for this month.
+                  </Text>
+                </View>
+              ) : (
+                breakdown.map((item) => {
+                  const isProfit = item.type === "profit";
+
+                  return (
+                    <View key={item.key} style={styles.desktopBreakdownRow}>
+                      <View
+                        style={[
+                          styles.desktopBreakdownDot,
+                          {
+                            backgroundColor: item.info.color,
+                          },
+                        ]}
+                      />
+
+                      <Text
+                        style={styles.desktopBreakdownName}
+                        numberOfLines={1}
+                      >
+                        {isProfit
+                          ? "Profit"
+                          : item.key.charAt(0).toUpperCase() +
+                            item.key.slice(1)}
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.desktopBreakdownPercent,
+
+                          isProfit && styles.desktopProfitText,
+                        ]}
+                      >
+                        {Math.round(item.percentage)}%
+                      </Text>
+
+                      <Text
+                        style={[
+                          styles.desktopBreakdownAmount,
+
+                          isProfit && styles.desktopProfitText,
+                        ]}
+                      >
+                        {formatMoney(item.amount)}
+                      </Text>
+                    </View>
+                  );
+                })
+              )}
+            </View>
+          </View>
+
+          <View style={styles.desktopFinanceStrip}>
+            <View style={styles.desktopFinanceItem}>
+              <Text style={styles.desktopFinanceLabel}>Expenses</Text>
+
+              <Text style={styles.desktopFinanceExpense}>
+                {formatMoney(totalExpenses)}
+              </Text>
+
+              <Text style={styles.desktopFinanceHint}>
+                {Math.round(expensePercentage)}% of revenue
+              </Text>
+            </View>
+
+            <View style={styles.desktopFinanceDivider} />
+
+            <View style={styles.desktopFinanceItem}>
+              <Text style={styles.desktopFinanceLabel}>
+                {profit >= 0 ? "Profit" : "Loss"}
+              </Text>
+
+              <Text
+                style={
+                  profit >= 0
+                    ? styles.desktopFinanceProfit
+                    : styles.desktopFinanceLoss
+                }
+              >
+                {formatMoney(Math.abs(profit))}
+              </Text>
+
+              <Text style={styles.desktopFinanceHint}>
+                {profit >= 0
+                  ? `${Math.round(profitPercentage)}% of revenue`
+                  : "Loss this month"}
+              </Text>
+            </View>
+
+            <View style={styles.desktopFinanceDivider} />
+
+            <View style={styles.desktopFinanceItem}>
+              <Text style={styles.desktopFinanceLabel}>Revenue</Text>
+
+              <Text style={styles.desktopFinanceRevenue}>
+                {formatMoney(revenue)}
+              </Text>
+
+              <Text style={styles.desktopFinanceHint}>Total collected</Text>
+            </View>
+          </View>
+        </>
+      )}
+    </View>
+  );
+}
+
+// ============================================================
+// DESKTOP EMPTY EXPENSES
+// ============================================================
+
+function DesktopEmptyExpenses({ styles, colors }) {
+  return (
+    <View style={styles.desktopEmptyCard}>
+      <View style={styles.desktopEmptyIcon}>
+        <FontAwesome6 name="receipt" size={22} color={colors.textFaint} />
+      </View>
+
+      <Text style={styles.desktopEmptyTitle}>No expenses this month</Text>
+
+      <Text style={styles.desktopEmptySubtitle}>
+        Your library expenses will appear here.
+      </Text>
+    </View>
+  );
+}
+// ============================================================
+// FINANCIAL OVERVIEW - MOBILE
 // ============================================================
 
 function FinancialOverview({
@@ -992,6 +1675,7 @@ function FinancialOverview({
               styles={styles}
               colors={colors}
               isDarkMode={isDarkMode}
+              compact
             />
 
             <View style={styles.breakdownList}>
@@ -1013,8 +1697,6 @@ function FinancialOverview({
 
                   return (
                     <View key={item.key} style={styles.breakdownRow}>
-                      {/* DOT */}
-
                       <View
                         style={[
                           styles.breakdownDot,
@@ -1023,8 +1705,6 @@ function FinancialOverview({
                           },
                         ]}
                       />
-
-                      {/* NAME */}
 
                       <View style={styles.breakdownNameWrap}>
                         <Text style={styles.breakdownName} numberOfLines={1}>
@@ -1035,25 +1715,16 @@ function FinancialOverview({
                         </Text>
                       </View>
 
-                      {/* PERCENTAGE */}
-
                       <Text
                         style={[
                           styles.breakdownPercent,
                           isProfit && styles.profitPercent,
                         ]}
                       >
-                        {Math.round(item.percentage)}%
+                        {Math.round(item.percentage || 0)}%
                       </Text>
 
-                      {/* AMOUNT */}
-
-                      <Text
-                        style={[
-                          styles.breakdownAmount,
-                          isProfit && styles.profitAmount,
-                        ]}
-                      >
+                      <Text style={styles.breakdownAmount}>
                         {formatMoney(item.amount)}
                       </Text>
                     </View>
@@ -1064,79 +1735,40 @@ function FinancialOverview({
           </View>
 
           {/* ==================================================
-              EXPENSE / PROFIT SUMMARY
+              FINANCIAL SUMMARY
           ================================================== */}
 
-          <View style={styles.financeStrip}>
-            {/* EXPENSE */}
+          <View style={styles.financeSummary}>
+            <View style={styles.financeSummaryItem}>
+              <Text style={styles.financeSummaryLabel}>Expenses</Text>
 
-            <View style={styles.financeItem}>
-              <View style={styles.financeLabelRow}>
-                <View
-                  style={[
-                    styles.financeMiniDot,
-                    {
-                      backgroundColor: isDarkMode ? "#F87171" : "#ef4444",
-                    },
-                  ]}
-                />
-
-                <Text style={styles.financeLabel}>Expenses</Text>
-              </View>
-
-              <Text style={styles.financeExpense}>
+              <Text style={styles.financeSummaryExpense}>
                 {formatMoney(totalExpenses)}
               </Text>
 
-              <Text style={styles.financePercentage}>
-                {Math.round(expensePercentage)}% of revenue
+              <Text style={styles.financeSummaryHint}>
+                {expensePercentage.toFixed(1)}% of revenue
               </Text>
             </View>
 
-            {/* DIVIDER */}
+            <View style={styles.financeSummaryDivider} />
 
-            <View style={styles.financeDivider} />
-
-            {/* PROFIT */}
-
-            <View style={styles.financeItem}>
-              <View style={styles.financeLabelRow}>
-                <View
-                  style={[
-                    styles.financeMiniDot,
-                    {
-                      backgroundColor:
-                        profit >= 0
-                          ? isDarkMode
-                            ? "#4ADE80"
-                            : "#10b981"
-                          : isDarkMode
-                          ? "#F87171"
-                          : "#ef4444",
-                    },
-                  ]}
-                />
-
-                <Text style={styles.financeLabel}>
-                  {profit >= 0 ? "Profit" : "Loss"}
-                </Text>
-              </View>
+            <View style={styles.financeSummaryItem}>
+              <Text style={styles.financeSummaryLabel}>Profit</Text>
 
               <Text
-                style={profit >= 0 ? styles.financeProfit : styles.financeLoss}
+                style={
+                  profit >= 0
+                    ? styles.financeSummaryProfit
+                    : styles.financeSummaryLoss
+                }
               >
-                {formatMoney(Math.abs(profit))}
+                {formatMoney(profit)}
               </Text>
 
-              {profit >= 0 ? (
-                <Text style={styles.financePercentage}>
-                  {Math.round(profitPercentage)}% of revenue
-                </Text>
-              ) : (
-                <Text style={styles.financeLossPercentage}>
-                  Loss this month
-                </Text>
-              )}
+              <Text style={styles.financeSummaryHint}>
+                {profitPercentage.toFixed(1)}% of revenue
+              </Text>
             </View>
           </View>
 
@@ -1144,13 +1776,13 @@ function FinancialOverview({
               PROFIT MESSAGE
           ================================================== */}
 
-          {profit > 0 && revenue > 0 && (
+          {profit >= 0 && revenue > 0 ? (
             <View style={styles.profitMessage}>
               <View style={styles.profitMessageIcon}>
                 <FontAwesome6
-                  name="arrow-trend-up"
-                  size={11}
-                  color={isDarkMode ? "#4ADE80" : "#059669"}
+                  name="chart-line"
+                  size={9}
+                  color={colors.success}
                 />
               </View>
 
@@ -1168,7 +1800,7 @@ function FinancialOverview({
                 {formatMoney(profit)}
               </Text>
             </View>
-          )}
+          ) : null}
         </>
       )}
     </View>
@@ -1180,36 +1812,32 @@ function FinancialOverview({
 // ============================================================
 
 function DonutChart({
-  data,
-  total,
-  revenue,
-  profit,
+  data = [],
+  total = 0,
+  revenue = 0,
+  profit = 0,
   styles,
   colors,
   isDarkMode,
+  compact = false,
 }) {
-  const size = 180;
-
-  const strokeWidth = 28;
+  const size = compact ? 150 : 180;
+  const strokeWidth = compact ? 20 : 25;
 
   const radiusValue = (size - strokeWidth) / 2;
 
   const circumference = 2 * Math.PI * radiusValue;
 
-  // ==========================================================
-  // EMPTY
-  // ==========================================================
+  const safeTotal = Number(total || 0);
 
-  if (!total || !data.length) {
+  if (!data.length || safeTotal <= 0) {
     return (
       <View style={styles.donutEmpty}>
-        <View style={styles.emptyDonutRing}>
-          <FontAwesome6 name="chart-pie" size={16} color={colors.textFaint} />
+        <View style={styles.emptyDonutRing} />
 
-          <Text style={styles.donutEmptyAmount}>₹0</Text>
-
-          <Text style={styles.donutCenterLabel}>NO DATA</Text>
-        </View>
+        <Text style={styles.donutEmptyAmount}>
+          {formatMoney(revenue || total)}
+        </Text>
       </View>
     );
   }
@@ -1220,25 +1848,14 @@ function DonutChart({
     <View style={styles.donutWrap}>
       <Svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
         <G rotation="-90" origin={`${size / 2}, ${size / 2}`}>
-          {/* ==================================================
-              BACKGROUND RING
-          ================================================== */}
-
-          <Circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radiusValue}
-            stroke={isDarkMode ? "#334155" : "#eef2f7"}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-          />
-
-          {/* ==================================================
-              SEGMENTS
-          ================================================== */}
-
           {data.map((item) => {
-            const length = (item.amount / total) * circumference;
+            const amount = Number(item.amount || 0);
+
+            if (amount <= 0) {
+              return null;
+            }
+
+            const length = (amount / safeTotal) * circumference;
 
             const currentOffset = offset;
 
@@ -1294,10 +1911,120 @@ function DonutChart({
 }
 
 // ============================================================
+// EXPENSE ROW - MOBILE
+// ============================================================
+
+function ExpenseRow({ item, styles, colors, isDarkMode, onEdit, onDelete }) {
+  const info = getCategoryInfo(item.category, isDarkMode);
+
+  const status = String(item.status || "PAID").toUpperCase();
+
+  const isPaid = status === "PAID";
+
+  return (
+    <View style={styles.expenseRow}>
+      {/* ==================================================
+          TOP
+      ================================================== */}
+
+      <View style={styles.expenseRowTop}>
+        <View style={styles.expenseCategoryWrap}>
+          <View
+            style={[
+              styles.expenseCategoryIcon,
+              {
+                backgroundColor: info.bg,
+              },
+            ]}
+          >
+            <FontAwesome6 name={info.icon} size={13} color={info.color} />
+          </View>
+
+          <View style={styles.expenseCategoryText}>
+            <Text style={styles.expenseCategoryName} numberOfLines={1}>
+              {String(item.category || "Other")
+                .charAt(0)
+                .toUpperCase() + String(item.category || "Other").slice(1)}
+            </Text>
+
+            <Text style={styles.expenseDate}>
+              {formatDate(item.expenseDate)}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.expenseAmount}>{formatMoney(item.amount)}</Text>
+      </View>
+
+      {/* ==================================================
+          BOTTOM
+      ================================================== */}
+
+      <View style={styles.expenseRowBottom}>
+        <View
+          style={[
+            styles.expenseStatusBadge,
+            isPaid ? styles.expensePaidBadge : styles.expensePendingBadge,
+          ]}
+        >
+          <View
+            style={[
+              styles.expenseStatusDot,
+              isPaid ? styles.expensePaidDot : styles.expensePendingDot,
+            ]}
+          />
+
+          <Text
+            style={[
+              styles.expenseStatusText,
+              isPaid ? styles.expensePaidText : styles.expensePendingText,
+            ]}
+          >
+            {isPaid ? "PAID" : "PENDING"}
+          </Text>
+        </View>
+
+        <View style={styles.expenseActions}>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={styles.expenseActionButton}
+            onPress={() => onEdit(item)}
+          >
+            <FontAwesome6 name="pen" size={10} color={colors.primaryBlue} />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[styles.expenseActionButton, styles.expenseDeleteButton]}
+            onPress={() => onDelete(item.id)}
+          >
+            <FontAwesome6 name="trash" size={10} color={colors.danger} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* ==================================================
+          COMMENT
+      ================================================== */}
+
+      {item.comment ? (
+        <View style={styles.commentRow}>
+          <FontAwesome6 name="comment" size={9} color={colors.textFaint} />
+
+          <Text style={styles.expenseComment} numberOfLines={2}>
+            {item.comment}
+          </Text>
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+// ============================================================
 // EMPTY EXPENSES
 // ============================================================
 
-function EmptyExpenses({ styles, colors }) {
+function EmptyExpenses({ styles, colors, onAddExpense }) {
   return (
     <View style={styles.emptyCard}>
       <View style={styles.emptyIcon}>
@@ -1309,6 +2036,18 @@ function EmptyExpenses({ styles, colors }) {
       <Text style={styles.emptySubtitle}>
         Your library expenses will appear here.
       </Text>
+
+      {onAddExpense ? (
+        <TouchableOpacity
+          style={styles.emptyAddButton}
+          activeOpacity={0.8}
+          onPress={onAddExpense}
+        >
+          <FontAwesome6 name="plus" size={11} color="#fff" />
+
+          <Text style={styles.emptyAddButtonText}>Add Expense</Text>
+        </TouchableOpacity>
+      ) : null}
     </View>
   );
 }
@@ -1353,14 +2092,20 @@ function BillingPeriodPicker({
       onRequestClose={onClose}
     >
       <View style={styles.periodOverlay}>
-        {/* BACKDROP */}
+        {/* ==================================================
+            BACKDROP
+        ================================================== */}
 
         <Pressable style={StyleSheet.absoluteFillObject} onPress={onClose} />
 
-        {/* MODAL */}
+        {/* ==================================================
+            MODAL
+        ================================================== */}
 
         <View style={styles.periodModal}>
-          {/* HEADER */}
+          {/* ==================================================
+              HEADER
+          ================================================== */}
 
           <View style={styles.periodModalHeader}>
             <View style={styles.periodHeaderLeft}>
@@ -1385,12 +2130,18 @@ function BillingPeriodPicker({
               </View>
             </View>
 
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={onClose}
+              activeOpacity={0.8}
+            >
               <Text style={styles.closeText}>×</Text>
             </TouchableOpacity>
           </View>
 
-          {/* YEAR / MONTH TABS */}
+          {/* ==================================================
+              MONTH / YEAR TABS
+          ================================================== */}
 
           <View style={styles.periodTabs}>
             <TouchableOpacity
@@ -1424,9 +2175,9 @@ function BillingPeriodPicker({
             </TouchableOpacity>
           </View>
 
-          {/* ====================================================
+          {/* ==================================================
               YEAR SELECTOR
-          ==================================================== */}
+          ================================================== */}
 
           {yearMode ? (
             <ScrollView
@@ -1524,7 +2275,9 @@ function BillingPeriodPicker({
             </View>
           )}
 
-          {/* FOOTER */}
+          {/* ==================================================
+              FOOTER
+          ================================================== */}
 
           {!yearMode && (
             <View style={styles.periodFooter}>
@@ -1544,561 +2297,422 @@ function BillingPeriodPicker({
     </Modal>
   );
 }
+// ============================================================
+// BILLING SCREEN STYLES
+// ============================================================
 
 function createStyles(colors) {
   return StyleSheet.create({
-    // ==========================================================
-    // CONTAINER
-    // ==========================================================
+    // ========================================================
+    // ROOT / MOBILE
+    // ========================================================
 
     container: {
       flex: 1,
       backgroundColor: colors.bg,
     },
 
-    center: {
+    scroll: {
       flex: 1,
-      alignItems: "center",
-      justifyContent: "center",
       backgroundColor: colors.bg,
     },
 
-    loadingText: {
-      marginTop: 10,
-      fontSize: 13,
-      color: colors.textSecondary,
+    scrollContent: {
+      paddingHorizontal: 14,
+      paddingTop: 12,
+      paddingBottom: 45,
     },
-
     listContent: {
-      padding: spacing.md,
-      paddingBottom: 50,
+      paddingHorizontal: 14,
+      paddingTop: 8,
+      paddingBottom: 40,
     },
 
-    // ==========================================================
-    // SUMMARY
-    // ==========================================================
+    // ========================================================
+    // MOBILE PERIOD HEADER
+    // ========================================================
+
+    mobilePeriodRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 14,
+    },
+
+    mobilePeriodLabel: {
+      fontSize: 11,
+      color: colors.textMuted,
+      marginBottom: 2,
+      fontWeight: "500",
+    },
+
+    mobilePeriodTitle: {
+      fontSize: 17,
+      color: colors.textPrimary,
+      fontWeight: "700",
+    },
+
+    mobilePeriodButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      paddingHorizontal: 11,
+      paddingVertical: 9,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+
+    mobilePeriodButtonText: {
+      fontSize: 12,
+      color: colors.textPrimary,
+      fontWeight: "600",
+    },
+
+    // ========================================================
+    // SUMMARY CARDS
+    // ========================================================
 
     summaryGrid: {
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
-      gap: 11,
-      marginBottom: 14,
+      width: "100%",
+      marginBottom: 8,
     },
 
     summaryCard: {
-      width: "48.2%",
+      width: "48.5%",
+      minHeight: 92,
       backgroundColor: colors.card,
-
-      borderRadius: 18,
-
-      padding: 15,
-
-      shadowColor: "#000",
-      shadowOpacity: 0.045,
-      shadowRadius: 10,
-
-      shadowOffset: {
-        width: 0,
-        height: 3,
-      },
-
-      elevation: 2,
-
+      borderRadius: 14,
       borderWidth: 1,
       borderColor: colors.border,
+      paddingHorizontal: 13,
+      paddingVertical: 12,
+      marginBottom: 10,
     },
 
     summaryCardTop: {
       flexDirection: "row",
+      alignItems: "flex-start",
       justifyContent: "space-between",
-      alignItems: "center",
-    },
-
-    summaryLabel: {
-      fontSize: 12,
-      fontWeight: "400",
-      color: colors.textSecondary,
     },
 
     summaryIcon: {
-      width: 29,
-      height: 29,
+      width: 34,
+      height: 34,
       borderRadius: 10,
       alignItems: "center",
       justifyContent: "center",
     },
 
-    summaryValue: {
-      fontSize: 22,
-      fontWeight: "700",
-      color: colors.textPrimary,
-      marginTop: 10,
+    summaryLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginBottom: 5,
+      fontWeight: "500",
     },
 
-    // ==========================================================
-    // OVERVIEW
-    // ==========================================================
+    summaryValue: {
+      fontSize: 18,
+      color: colors.textPrimary,
+      fontWeight: "800",
+      marginTop: 8,
+    },
+
+    // ========================================================
+    // FINANCIAL OVERVIEW
+    // ========================================================
 
     overviewCard: {
       backgroundColor: colors.card,
-
-      borderRadius: 20,
-
-      padding: 16,
-
-      marginBottom: 20,
-
-      shadowColor: "#000",
-      shadowOpacity: 0.045,
-      shadowRadius: 12,
-
-      shadowOffset: {
-        width: 0,
-        height: 4,
-      },
-
-      elevation: 2,
-
+      borderRadius: 16,
       borderWidth: 1,
       borderColor: colors.border,
+      padding: 16,
+      marginBottom: 16,
     },
 
     overviewHeader: {
       flexDirection: "row",
-
       justifyContent: "space-between",
-
-      alignItems: "center",
-
-      marginBottom: 10,
+      alignItems: "flex-start",
+      marginBottom: 18,
     },
 
     overviewTitleArea: {
       flex: 1,
-
-      paddingRight: 8,
+      paddingRight: 10,
     },
 
     chartTitle: {
       fontSize: 16,
-
-      fontWeight: "700",
-
+      fontWeight: "800",
       color: colors.textPrimary,
     },
 
     chartSubtitle: {
-      fontSize: 12,
-
-      color: colors.textSecondary,
-
       marginTop: 3,
+      fontSize: 11,
+      color: colors.textMuted,
     },
 
     periodSelector: {
       flexDirection: "row",
-
       alignItems: "center",
-
-      gap: 7,
-
-      paddingHorizontal: 9,
-
-      paddingVertical: 8,
-
-      borderRadius: 12,
-
-      backgroundColor: colors.statBlueBg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bg,
+      borderRadius: 10,
+      paddingHorizontal: 8,
+      paddingVertical: 7,
+      maxWidth: 130,
     },
 
     calendarIconBox: {
       width: 25,
-
       height: 25,
-
-      borderRadius: 8,
-
-      backgroundColor: colors.card,
-
+      borderRadius: 7,
+      backgroundColor: colors.statBlueBg,
       alignItems: "center",
-
       justifyContent: "center",
+      marginRight: 6,
     },
 
     periodSelectorText: {
       fontSize: 11,
-
-      fontWeight: "800",
-
-      color: colors.primaryBlue,
+      color: colors.textPrimary,
+      fontWeight: "700",
     },
 
     periodSelectorHint: {
       fontSize: 8,
-
-      color: colors.textSecondary,
-
+      color: colors.textMuted,
       marginTop: 1,
     },
 
     chartLoading: {
-      height: 270,
-
+      height: 230,
       alignItems: "center",
-
       justifyContent: "center",
     },
-
-    // ==========================================================
-    // DONUT
-    // ==========================================================
 
     donutSection: {
       flexDirection: "row",
-
       alignItems: "center",
-
-      minHeight: 210,
+      width: "100%",
+      minHeight: 185,
     },
 
     donutWrap: {
-      width: 180,
-
-      height: 180,
-
+      width: 145,
+      height: 145,
       alignItems: "center",
-
       justifyContent: "center",
+      position: "relative",
     },
 
     donutCenter: {
       position: "absolute",
-
-      width: 110,
-
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
       alignItems: "center",
-
       justifyContent: "center",
     },
 
     donutCenterIcon: {
-      width: 24,
-
-      height: 24,
-
-      borderRadius: 8,
-
+      width: 22,
+      height: 22,
+      borderRadius: 7,
       backgroundColor: colors.successBg,
-
       alignItems: "center",
-
       justifyContent: "center",
-
       marginBottom: 4,
     },
 
     donutCenterAmount: {
-      fontSize: 16,
-
+      fontSize: 13,
       fontWeight: "800",
-
       color: colors.textPrimary,
-
-      textAlign: "center",
     },
 
     donutCenterLabel: {
+      marginTop: 2,
       fontSize: 7,
-
-      fontWeight: "800",
-
-      color: colors.textFaint,
-
-      marginTop: 3,
-
-      textAlign: "center",
-
-      letterSpacing: 0.3,
+      fontWeight: "700",
+      color: colors.textMuted,
+      letterSpacing: 0.4,
     },
 
     donutEmpty: {
-      width: 180,
-
-      height: 180,
-
+      width: 150,
+      height: 150,
       alignItems: "center",
-
       justifyContent: "center",
+      position: "relative",
     },
 
     emptyDonutRing: {
-      width: 150,
-
-      height: 150,
-
-      borderRadius: 75,
-
-      borderWidth: 25,
-
+      width: 125,
+      height: 125,
+      borderRadius: 100,
+      borderWidth: 20,
       borderColor: colors.borderLight,
-
-      alignItems: "center",
-
-      justifyContent: "center",
+      position: "absolute",
     },
 
     donutEmptyAmount: {
-      fontSize: 14,
-
+      fontSize: 12,
       fontWeight: "800",
-
       color: colors.textPrimary,
-
-      marginTop: 5,
     },
-
-    // ==========================================================
-    // BREAKDOWN
-    // ==========================================================
 
     breakdownList: {
       flex: 1,
-
-      marginLeft: 7,
-
-      gap: 10,
-
       minWidth: 0,
+      paddingLeft: 8,
     },
 
     breakdownRow: {
       flexDirection: "row",
-
       alignItems: "center",
-
+      marginBottom: 10,
       minWidth: 0,
     },
 
     breakdownDot: {
-      width: 8,
-
-      height: 8,
-
-      borderRadius: 4,
-
+      width: 7,
+      height: 7,
+      borderRadius: 10,
       marginRight: 7,
     },
 
     breakdownNameWrap: {
       flex: 1,
-
       minWidth: 0,
     },
 
     breakdownName: {
-      fontSize: 11,
-
-      fontWeight: "600",
-
+      fontSize: 10,
       color: colors.textSecondary,
+      fontWeight: "500",
     },
 
     breakdownPercent: {
-      width: 31,
-
       fontSize: 10,
-
-      fontWeight: "700",
-
-      color: colors.textPrimary,
-
+      color: colors.textMuted,
+      width: 34,
       textAlign: "right",
+      fontWeight: "600",
     },
 
     profitPercent: {
       color: colors.success,
-
-      fontWeight: "800",
     },
 
     breakdownAmount: {
-      width: 62,
-
-      fontSize: 10,
-
-      fontWeight: "700",
-
-      color: colors.textPrimary,
-
+      width: 66,
       textAlign: "right",
-    },
-
-    profitAmount: {
-      color: colors.success,
-
-      fontWeight: "800",
+      fontSize: 10,
+      color: colors.textPrimary,
+      fontWeight: "700",
     },
 
     noBreakdownBox: {
-      alignItems: "flex-start",
-
-      gap: 7,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 8,
     },
 
     noBreakdown: {
-      fontSize: 11,
-
-      color: colors.textFaint,
-
-      lineHeight: 17,
-    },
-
-    // ==========================================================
-    // FINANCE STRIP
-    // ==========================================================
-
-    financeStrip: {
-      flexDirection: "row",
-
-      alignItems: "center",
-
-      backgroundColor: colors.borderLight,
-
-      borderRadius: 14,
-
-      paddingVertical: 12,
-
-      paddingHorizontal: 14,
-
-      marginTop: 6,
-    },
-
-    financeItem: {
-      flex: 1,
-    },
-
-    financeDivider: {
-      width: 1,
-
-      height: 43,
-
-      backgroundColor: colors.border,
-
-      marginHorizontal: 14,
-    },
-
-    financeLabelRow: {
-      flexDirection: "row",
-
-      alignItems: "center",
-
-      gap: 5,
-
-      marginBottom: 3,
-    },
-
-    financeMiniDot: {
-      width: 5,
-
-      height: 5,
-
-      borderRadius: 3,
-    },
-
-    financeLabel: {
+      marginTop: 7,
       fontSize: 10,
-
-      color: colors.textFaint,
+      lineHeight: 15,
+      color: colors.textMuted,
+      textAlign: "center",
     },
 
-    financeExpense: {
-      fontSize: 15,
+    // ========================================================
+    // FINANCE SUMMARY
+    // ========================================================
 
-      fontWeight: "700",
+    financeSummary: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
+      marginTop: 10,
+      paddingTop: 14,
+    },
 
+    financeSummaryItem: {
+      flex: 1,
+      alignItems: "center",
+    },
+
+    financeSummaryDivider: {
+      width: 1,
+      backgroundColor: colors.borderLight,
+      marginHorizontal: 10,
+    },
+
+    financeSummaryLabel: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginBottom: 4,
+      fontWeight: "500",
+    },
+
+    financeSummaryExpense: {
+      fontSize: 14,
+      fontWeight: "800",
       color: colors.danger,
     },
 
-    financeRevenue: {
-      fontSize: 15,
-
-      fontWeight: "700",
-
+    financeSummaryProfit: {
+      fontSize: 14,
+      fontWeight: "800",
       color: colors.success,
     },
 
-    financeProfit: {
-      fontSize: 15,
-
-      fontWeight: "700",
-
-      color: colors.success,
-    },
-
-    financeLoss: {
-      fontSize: 15,
-
-      fontWeight: "700",
-
+    financeSummaryLoss: {
+      fontSize: 14,
+      fontWeight: "800",
       color: colors.danger,
     },
 
-    financePercentage: {
+    financeSummaryHint: {
+      marginTop: 2,
       fontSize: 8,
-
       color: colors.textFaint,
-
-      marginTop: 2,
     },
 
-    financeLossPercentage: {
-      fontSize: 8,
-
-      color: colors.danger,
-
-      marginTop: 2,
-
-      fontWeight: "600",
-    },
-
-    // ==========================================================
+    // ========================================================
     // PROFIT MESSAGE
-    // ==========================================================
+    // ========================================================
 
     profitMessage: {
-      flexDirection: "row",
-
-      alignItems: "center",
-
-      marginTop: 10,
-
-      paddingHorizontal: 11,
-
-      paddingVertical: 9,
-
-      borderRadius: 12,
-
+      marginTop: 14,
+      borderRadius: 10,
       backgroundColor: colors.successBg,
-
       borderWidth: 1,
-
-      borderColor: colors.border,
+      borderColor: colors.borderLight,
+      padding: 9,
+      flexDirection: "row",
+      alignItems: "center",
     },
 
     profitMessageIcon: {
-      width: 27,
-
-      height: 27,
-
-      borderRadius: 9,
-
-      backgroundColor: colors.successBg,
-
+      width: 25,
+      height: 25,
+      borderRadius: 8,
+      backgroundColor: colors.card,
       alignItems: "center",
-
       justifyContent: "center",
-
       marginRight: 8,
     },
 
@@ -2108,743 +2722,1817 @@ function createStyles(colors) {
 
     profitMessageTitle: {
       fontSize: 10,
-
-      fontWeight: "800",
-
-      color: colors.success,
+      color: colors.textPrimary,
+      fontWeight: "700",
     },
 
     profitMessageSubtitle: {
       fontSize: 8,
-
-      color: colors.textSecondary,
-
+      color: colors.textMuted,
       marginTop: 2,
     },
 
     profitMessageAmount: {
-      fontSize: 12,
-
+      fontSize: 11,
       fontWeight: "800",
-
       color: colors.success,
     },
 
-    // ==========================================================
-    // SECTION
-    // ==========================================================
+    // ========================================================
+    // EXPENSE SECTION
+    // ========================================================
 
-    sectionHeader: {
+    expensesSection: {
+      marginTop: 4,
+      width: "100%",
+    },
+
+    expensesSectionHeader: {
+      width: "100%",
       flexDirection: "row",
-
       alignItems: "center",
-
       justifyContent: "space-between",
-
-      marginBottom: 11,
+      marginBottom: 12,
+      minHeight: 42,
     },
-
-    sectionTitleArea: {
+    expensesHeaderText: {
       flex: 1,
+      minWidth: 0,
+      paddingRight: 10,
     },
 
-    sectionTitle: {
-      fontSize: 16,
-
-      fontWeight: "700",
-
+    expensesTitle: {
+      fontSize: 17,
+      fontWeight: "800",
       color: colors.textPrimary,
     },
 
-    sectionSubtitle: {
-      fontSize: 12,
-
-      color: colors.textSecondary,
-
-      marginTop: 3,
+    expensesSubtitle: {
+      marginTop: 2,
+      fontSize: 10,
+      color: colors.textMuted,
     },
 
-    addButton: {
+    addExpenseButton: {
       flexDirection: "row",
-
       alignItems: "center",
-
+      justifyContent: "center",
       gap: 6,
-
-      backgroundColor: colors.primaryBlue,
-
       paddingHorizontal: 13,
-
       paddingVertical: 10,
-
-      borderRadius: 12,
-
-      shadowColor: colors.primaryBlue,
-
-      shadowOpacity: 0.18,
-
-      shadowRadius: 7,
-
-      shadowOffset: {
-        width: 0,
-        height: 3,
-      },
-
-      elevation: 2,
+      borderRadius: 10,
+      backgroundColor: colors.primaryBlue,
     },
 
-    addButtonText: {
+    addExpenseButtonText: {
       color: "#fff",
-
-      fontSize: 12,
-
+      fontSize: 11,
       fontWeight: "700",
     },
 
-    // ==========================================================
-    // EXPENSE CARD
-    // ==========================================================
-
-    expenseCard: {
-      backgroundColor: colors.card,
-
-      borderRadius: 17,
-
-      paddingVertical: 12,
-
-      paddingHorizontal: 11,
-
-      marginBottom: 9,
-
+    sectionAddButton: {
       flexDirection: "row",
-
       alignItems: "center",
-
-      borderWidth: 1,
-
-      borderColor: colors.borderLight,
-
-      shadowColor: "#000",
-
-      shadowOpacity: 0.035,
-
-      shadowRadius: 8,
-
-      shadowOffset: {
-        width: 0,
-        height: 2,
-      },
-
-      elevation: 1,
-    },
-
-    expenseCardLast: {
-      marginBottom: 0,
-    },
-
-    expenseIcon: {
-      width: 46,
-
-      height: 46,
-
-      borderRadius: 14,
-
-      alignItems: "center",
-
       justifyContent: "center",
-
-      marginRight: 11,
+      gap: 5,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+      borderRadius: 9,
+      backgroundColor: colors.primaryBlue,
+      flexShrink: 0,
+      minWidth: 92,
+      height: 34,
+    },
+    sectionAddButtonText: {
+      color: "#fff",
+      fontSize: 10,
+      fontWeight: "700",
+      flexShrink: 0,
     },
 
-    expenseMain: {
-      flex: 1,
+    // ========================================================
+    // MOBILE EXPENSE ROW
+    // ========================================================
 
+    expenseRow: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 13,
+      padding: 12,
+      marginBottom: 9,
+    },
+
+    expenseRowTop: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+
+    expenseCategoryWrap: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
       minWidth: 0,
     },
 
-    expenseTopRow: {
-      flexDirection: "row",
-
+    expenseCategoryIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: 10,
       alignItems: "center",
-
-      justifyContent: "space-between",
-
-      gap: 8,
+      justifyContent: "center",
+      marginRight: 9,
     },
 
-    expenseCategory: {
+    expenseCategoryText: {
       flex: 1,
+      minWidth: 0,
+    },
 
-      fontSize: 13,
-
+    expenseCategoryName: {
+      fontSize: 12,
       fontWeight: "700",
-
       color: colors.textPrimary,
-    },
-
-    expenseAmount: {
-      fontSize: 14,
-
-      fontWeight: "800",
-
-      color: colors.textPrimary,
-    },
-
-    expenseMetaRow: {
-      flexDirection: "row",
-
-      alignItems: "center",
-
-      marginTop: 5,
-
-      gap: 8,
-    },
-
-    dateContainer: {
-      flexDirection: "row",
-
-      alignItems: "center",
-
-      gap: 5,
     },
 
     expenseDate: {
-      fontSize: 10,
-
-      color: colors.textFaint,
+      fontSize: 9,
+      color: colors.textMuted,
+      marginTop: 3,
     },
 
-    statusBadge: {
+    expenseAmount: {
+      marginLeft: 10,
+      fontSize: 14,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    expenseRowBottom: {
       flexDirection: "row",
-
+      justifyContent: "space-between",
       alignItems: "center",
-
-      gap: 4,
-
-      paddingHorizontal: 7,
-
-      paddingVertical: 3,
-
-      borderRadius: 7,
+      marginTop: 10,
+      paddingTop: 9,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
     },
 
-    paidBadge: {
+    expenseStatusBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+
+    expensePaidBadge: {
       backgroundColor: colors.successBg,
     },
 
-    pendingBadge: {
+    expensePendingBadge: {
       backgroundColor: colors.warningBg,
     },
 
-    statusDot: {
+    expenseStatusDot: {
       width: 5,
-
       height: 5,
-
-      borderRadius: 3,
+      borderRadius: 10,
+      marginRight: 5,
     },
 
-    paidDot: {
+    expensePaidDot: {
       backgroundColor: colors.success,
     },
 
-    pendingDot: {
+    expensePendingDot: {
       backgroundColor: colors.warning,
     },
 
-    statusText: {
-      fontSize: 7,
-
+    expenseStatusText: {
+      fontSize: 8,
       fontWeight: "800",
     },
 
-    paidText: {
+    expensePaidText: {
       color: colors.success,
     },
 
-    pendingText: {
+    expensePendingText: {
       color: colors.warning,
+    },
+
+    expenseActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+
+    expenseActionButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 8,
+      backgroundColor: colors.statBlueBg,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    expenseDeleteButton: {
+      backgroundColor: colors.dangerBg,
     },
 
     commentRow: {
       flexDirection: "row",
-
-      alignItems: "center",
-
-      gap: 5,
-
-      marginTop: 5,
-
-      paddingRight: 4,
+      alignItems: "flex-start",
+      marginTop: 8,
+      paddingTop: 7,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
     },
 
     expenseComment: {
       flex: 1,
-
+      marginLeft: 6,
       fontSize: 9,
-
-      color: colors.textSecondary,
+      lineHeight: 13,
+      color: colors.textMuted,
     },
 
-    // ==========================================================
-    // ACTIONS
-    // ==========================================================
-
-    actionColumn: {
-      marginLeft: 8,
-
-      alignItems: "center",
-
-      gap: 6,
-    },
-
-    editButton: {
-      width: 29,
-
-      height: 29,
-
-      borderRadius: 9,
-
-      backgroundColor: colors.borderLight,
-
-      alignItems: "center",
-
-      justifyContent: "center",
-
-      borderWidth: 1,
-
-      borderColor: colors.border,
-    },
-
-    deleteButton: {
-      backgroundColor: colors.dangerBg,
-
-      borderColor: colors.border,
-    },
-
-    // ==========================================================
-    // EMPTY
-    // ==========================================================
+    // ========================================================
+    // EMPTY STATE
+    // ========================================================
 
     emptyCard: {
       backgroundColor: colors.card,
-
-      borderRadius: 18,
-
-      alignItems: "center",
-
-      justifyContent: "center",
-
-      paddingVertical: 38,
-
       borderWidth: 1,
-
-      borderColor: colors.borderLight,
+      borderColor: colors.border,
+      borderRadius: 14,
+      paddingVertical: 30,
+      paddingHorizontal: 20,
+      alignItems: "center",
     },
 
     emptyIcon: {
-      width: 52,
-
-      height: 52,
-
-      borderRadius: 18,
-
-      backgroundColor: colors.borderLight,
-
+      width: 50,
+      height: 50,
+      borderRadius: 15,
+      backgroundColor: colors.bg,
       alignItems: "center",
-
       justifyContent: "center",
-
       marginBottom: 10,
     },
 
     emptyTitle: {
-      fontSize: 14,
-
+      fontSize: 13,
       fontWeight: "700",
-
       color: colors.textPrimary,
     },
 
     emptySubtitle: {
-      fontSize: 11,
-
-      color: colors.textFaint,
-
       marginTop: 4,
+      fontSize: 10,
+      color: colors.textMuted,
+      textAlign: "center",
     },
 
-    // ==========================================================
-    // PERIOD PICKER OVERLAY
-    // ==========================================================
+    emptyAddButton: {
+      marginTop: 13,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 9,
+      backgroundColor: colors.primaryBlue,
+    },
+
+    emptyAddButtonText: {
+      color: "#fff",
+      fontSize: 10,
+      fontWeight: "700",
+    },
+
+    // ========================================================
+    // BILLING PERIOD MODAL
+    // ========================================================
 
     periodOverlay: {
       flex: 1,
-
-      backgroundColor: "rgba(15,23,42,0.48)",
-
+      backgroundColor: "rgba(0,0,0,0.45)",
+      alignItems: "center",
       justifyContent: "center",
-
-      padding: 20,
+      paddingHorizontal: 18,
     },
 
     periodModal: {
+      width: "100%",
+      maxWidth: 430,
+      maxHeight: "85%",
       backgroundColor: colors.card,
-
-      borderRadius: 23,
-
-      padding: 18,
-
-      maxHeight: "82%",
-
-      shadowColor: "#000",
-
-      shadowOpacity: 0.12,
-
-      shadowRadius: 25,
-
-      shadowOffset: {
-        width: 0,
-        height: 10,
-      },
-
-      elevation: 8,
-
+      borderRadius: 18,
+      overflow: "hidden",
       borderWidth: 1,
-
       borderColor: colors.border,
     },
 
     periodModalHeader: {
       flexDirection: "row",
-
-      justifyContent: "space-between",
-
       alignItems: "center",
-
-      marginBottom: 15,
+      justifyContent: "space-between",
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 13,
     },
 
     periodHeaderLeft: {
       flexDirection: "row",
-
       alignItems: "center",
-
       flex: 1,
     },
 
     periodHeaderIcon: {
-      width: 39,
-
-      height: 39,
-
-      borderRadius: 12,
-
+      width: 35,
+      height: 35,
+      borderRadius: 10,
       backgroundColor: colors.statBlueBg,
-
       alignItems: "center",
-
       justifyContent: "center",
-
       marginRight: 10,
     },
 
     periodModalTitle: {
-      fontSize: 19,
-
+      fontSize: 15,
       fontWeight: "800",
-
       color: colors.textPrimary,
     },
 
     periodModalSubtitle: {
-      fontSize: 11,
-
-      color: colors.textSecondary,
-
-      marginTop: 3,
+      fontSize: 9,
+      color: colors.textMuted,
+      marginTop: 2,
     },
 
     closeButton: {
-      width: 35,
-
-      height: 35,
-
-      borderRadius: 18,
-
-      backgroundColor: colors.borderLight,
-
+      width: 30,
+      height: 30,
+      borderRadius: 9,
+      backgroundColor: colors.bg,
       alignItems: "center",
-
       justifyContent: "center",
     },
 
     closeText: {
-      fontSize: 25,
-
-      lineHeight: 27,
-
+      fontSize: 21,
+      lineHeight: 22,
       color: colors.textSecondary,
+      fontWeight: "300",
     },
-
-    // ==========================================================
-    // PERIOD TABS
-    // ==========================================================
 
     periodTabs: {
       flexDirection: "row",
-
-      backgroundColor: colors.borderLight,
-
-      borderRadius: 12,
-
+      marginHorizontal: 16,
+      backgroundColor: colors.bg,
+      borderRadius: 10,
       padding: 3,
-
-      marginBottom: 15,
+      marginBottom: 14,
     },
 
     periodTab: {
       flex: 1,
-
-      height: 38,
-
-      borderRadius: 9,
-
       alignItems: "center",
-
       justifyContent: "center",
+      paddingVertical: 8,
+      borderRadius: 8,
     },
 
     periodTabActive: {
       backgroundColor: colors.card,
-
       shadowColor: "#000",
-
-      shadowOpacity: 0.05,
-
-      shadowRadius: 5,
-
       shadowOffset: {
         width: 0,
-        height: 2,
+        height: 1,
       },
-
-      elevation: 1,
+      shadowOpacity: 0.08,
+      shadowRadius: 3,
+      elevation: 2,
     },
 
     periodTabText: {
-      fontSize: 12,
-
+      fontSize: 11,
+      color: colors.textMuted,
       fontWeight: "600",
-
-      color: colors.textSecondary,
     },
 
     periodTabTextActive: {
       color: colors.primaryBlue,
-
       fontWeight: "800",
     },
 
-    // ==========================================================
-    // YEAR GRID
-    // ==========================================================
-
     yearScroll: {
-      maxHeight: 390,
+      maxHeight: 300,
     },
 
     yearGrid: {
+      paddingHorizontal: 16,
+      paddingBottom: 14,
       flexDirection: "row",
-
       flexWrap: "wrap",
-
-      gap: 9,
-
-      paddingBottom: 3,
+      justifyContent: "space-between",
     },
 
     yearItem: {
-      width: "31.8%",
-
-      minHeight: 46,
-
-      borderRadius: 12,
-
+      width: "31.5%",
+      minHeight: 44,
+      marginBottom: 9,
       borderWidth: 1,
-
       borderColor: colors.border,
-
+      backgroundColor: colors.bg,
+      borderRadius: 10,
       alignItems: "center",
-
       justifyContent: "center",
-
-      flexDirection: "row",
-
-      gap: 5,
+      position: "relative",
     },
 
     yearItemActive: {
-      backgroundColor: colors.statBlueBg,
-
       borderColor: colors.primaryBlue,
+      backgroundColor: colors.statBlueBg,
     },
 
     yearItemText: {
       fontSize: 12,
-
       fontWeight: "600",
-
       color: colors.textSecondary,
     },
 
     yearItemTextActive: {
       color: colors.primaryBlue,
-
       fontWeight: "800",
     },
 
     yearCheck: {
-      width: 16,
-
-      height: 16,
-
-      borderRadius: 8,
-
+      position: "absolute",
+      top: 4,
+      right: 4,
+      width: 15,
+      height: 15,
+      borderRadius: 5,
       backgroundColor: colors.primaryBlue,
-
       alignItems: "center",
-
       justifyContent: "center",
     },
-
-    // ==========================================================
-    // MONTH GRID
-    // ==========================================================
 
     monthGrid: {
       flexDirection: "row",
-
       flexWrap: "wrap",
-
-      gap: 9,
+      paddingHorizontal: 16,
+      paddingBottom: 15,
+      justifyContent: "space-between",
     },
 
     monthItem: {
-      width: "31.8%",
-
-      minHeight: 48,
-
-      borderRadius: 13,
-
+      width: "31.5%",
+      minHeight: 47,
+      marginBottom: 9,
       borderWidth: 1,
-
       borderColor: colors.border,
-
-      flexDirection: "row",
-
+      backgroundColor: colors.bg,
+      borderRadius: 10,
       alignItems: "center",
-
       justifyContent: "center",
-
-      gap: 6,
+      position: "relative",
     },
 
     monthItemActive: {
-      backgroundColor: colors.statBlueBg,
-
       borderColor: colors.primaryBlue,
+      backgroundColor: colors.statBlueBg,
     },
 
     monthItemLocked: {
-      backgroundColor: colors.borderLight,
-
-      borderColor: colors.borderLight,
+      opacity: 0.55,
     },
 
     monthItemText: {
-      fontSize: 12,
-
-      fontWeight: "600",
-
+      fontSize: 11,
+      fontWeight: "700",
       color: colors.textSecondary,
     },
 
     monthItemTextActive: {
       color: colors.primaryBlue,
-
       fontWeight: "800",
     },
 
     monthItemTextLocked: {
       color: colors.textFaint,
-
-      fontWeight: "600",
     },
 
     monthCheck: {
+      position: "absolute",
+      top: 4,
+      right: 4,
+      width: 15,
+      height: 15,
+      borderRadius: 5,
+      backgroundColor: colors.card,
       alignItems: "center",
-
       justifyContent: "center",
     },
 
-    // ==========================================================
-    // PERIOD FOOTER
-    // ==========================================================
-
     periodFooter: {
       flexDirection: "row",
-
       alignItems: "center",
-
-      gap: 6,
-
-      marginTop: 15,
-
-      paddingTop: 12,
-
+      paddingHorizontal: 16,
+      paddingVertical: 11,
+      backgroundColor: colors.bg,
       borderTopWidth: 1,
-
       borderTopColor: colors.borderLight,
     },
 
     periodFooterText: {
       flex: 1,
-
-      fontSize: 10,
-
+      marginLeft: 6,
+      fontSize: 8,
       color: colors.textFaint,
-
-      lineHeight: 15,
     },
-    // ==========================================================
-    // PERIOD FOOTER
-    // ==========================================================
 
-    periodFooter: {
+    // ========================================================
+    // DESKTOP BILLING
+    // ========================================================
+
+    desktopRoot: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+
+    desktopScroll: {
+      flex: 1,
+    },
+
+    desktopScrollContent: {
+      padding: 24,
+      paddingBottom: 40,
+    },
+
+    // ========================================================
+    // DESKTOP PERIOD TOOLBAR
+    // ========================================================
+
+    periodToolbar: {
       flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 20,
+    },
+
+    periodLabel: {
+      fontSize: 18,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    periodDescription: {
+      marginTop: 4,
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+
+    periodActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+
+    periodButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      paddingHorizontal: 13,
+      paddingVertical: 10,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+    },
+
+    periodButtonText: {
+      fontSize: 11,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+
+    // ========================================================
+    // DESKTOP SUMMARY GRID
+    // ========================================================
+
+    desktopSummaryGrid: {
+      flexDirection: "row",
+      gap: 14,
+      marginBottom: 18,
+    },
+
+    desktopSummaryCard: {
+      flex: 1,
+      minWidth: 180,
+      backgroundColor: colors.card,
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 16,
+    },
+
+    desktopSummaryTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    desktopSummaryLabel: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+
+    desktopSummaryValue: {
+      marginTop: 7,
+      fontSize: 22,
+      color: colors.textPrimary,
+      fontWeight: "800",
+    },
+
+    desktopSummaryIcon: {
+      width: 38,
+      height: 38,
+      borderRadius: 11,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    // ========================================================
+    // DESKTOP FINANCIAL OVERVIEW
+    // ========================================================
+
+    desktopOverviewCard: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 15,
+      padding: 18,
+      marginBottom: 18,
+    },
+
+    desktopOverviewHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 18,
+    },
+
+    desktopOverviewTitle: {
+      fontSize: 15,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    desktopOverviewSubtitle: {
+      marginTop: 3,
+      fontSize: 10,
+      color: colors.textMuted,
+    },
+
+    desktopPeriodButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 7,
+      paddingHorizontal: 11,
+      paddingVertical: 8,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.bg,
+    },
+
+    desktopPeriodButtonText: {
+      fontSize: 10,
+      color: colors.textPrimary,
+      fontWeight: "700",
+    },
+
+    desktopChartLoading: {
+      minHeight: 220,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    desktopOverviewBody: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: 210,
+    },
+
+    desktopBreakdownList: {
+      flex: 1,
+      marginLeft: 35,
+      paddingRight: 10,
+    },
+
+    desktopBreakdownRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingVertical: 9,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+
+    desktopBreakdownDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 10,
+      marginRight: 9,
+    },
+
+    desktopBreakdownName: {
+      flex: 1,
+      fontSize: 11,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+
+    desktopBreakdownPercent: {
+      width: 55,
+      textAlign: "right",
+      fontSize: 10,
+      color: colors.textMuted,
+      fontWeight: "600",
+    },
+
+    desktopBreakdownAmount: {
+      width: 95,
+      textAlign: "right",
+      fontSize: 11,
+      color: colors.textPrimary,
+      fontWeight: "800",
+    },
+
+    desktopProfitText: {
+      color: colors.success,
+    },
+
+    desktopNoData: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 30,
+    },
+
+    desktopNoDataText: {
+      marginTop: 8,
+      maxWidth: 230,
+      textAlign: "center",
+      fontSize: 10,
+      lineHeight: 15,
+      color: colors.textMuted,
+    },
+
+    desktopFinanceStrip: {
+      flexDirection: "row",
+      alignItems: "stretch",
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
+      marginTop: 16,
+      paddingTop: 15,
+    },
+
+    desktopFinanceItem: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    desktopFinanceDivider: {
+      width: 1,
+      backgroundColor: colors.borderLight,
+      marginHorizontal: 20,
+    },
+
+    desktopFinanceLabel: {
+      fontSize: 10,
+      color: colors.textMuted,
+      marginBottom: 4,
+    },
+
+    desktopFinanceExpense: {
+      fontSize: 15,
+      color: colors.danger,
+      fontWeight: "800",
+    },
+
+    desktopFinanceProfit: {
+      fontSize: 15,
+      color: colors.success,
+      fontWeight: "800",
+    },
+
+    desktopFinanceLoss: {
+      fontSize: 15,
+      color: colors.danger,
+      fontWeight: "800",
+    },
+
+    desktopFinanceRevenue: {
+      fontSize: 15,
+      color: colors.primaryBlue,
+      fontWeight: "800",
+    },
+
+    desktopFinanceHint: {
+      marginTop: 2,
+      fontSize: 8,
+      color: colors.textFaint,
+    },
+
+    // ========================================================
+    // DESKTOP EXPENSE SECTION
+    // ========================================================
+
+    expensesSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 11,
+    },
+
+    expensesTitle: {
+      fontSize: 16,
+      color: colors.textPrimary,
+      fontWeight: "800",
+    },
+
+    expensesSubtitle: {
+      marginTop: 3,
+      fontSize: 10,
+      color: colors.textMuted,
+    },
+
+    expenseTable: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      overflow: "hidden",
+    },
+
+    expenseTableHeader: {
+      minHeight: 42,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.bg,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      paddingHorizontal: 14,
+    },
+
+    tableHeaderText: {
+      fontSize: 9,
+      color: colors.textMuted,
+      fontWeight: "800",
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+    },
+
+    categoryColumn: {
+      flex: 1.3,
+    },
+
+    dateColumn: {
+      width: 115,
+    },
+
+    statusColumn: {
+      width: 95,
+    },
+
+    commentColumn: {
+      flex: 1,
+    },
+
+    amountColumn: {
+      width: 100,
+      textAlign: "right",
+    },
+
+    actionColumn: {
+      width: 82,
+      textAlign: "center",
+    },
+
+    expenseTableRow: {
+      minHeight: 62,
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 14,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+
+    expenseTableRowLast: {
+      borderBottomWidth: 0,
+    },
+
+    categoryCell: {
+      flex: 1.3,
+      flexDirection: "row",
+      alignItems: "center",
+      minWidth: 0,
+    },
+
+    categoryIcon: {
+      width: 30,
+      height: 30,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 8,
+    },
+
+    categoryText: {
+      flex: 1,
+      fontSize: 10,
+      color: colors.textPrimary,
+      fontWeight: "700",
+    },
+
+    dateCell: {
+      width: 115,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+    },
+
+    dateText: {
+      fontSize: 9,
+      color: colors.textSecondary,
+    },
+
+    statusCell: {
+      width: 95,
+    },
+
+    desktopStatusBadge: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      borderRadius: 999,
+      paddingHorizontal: 8,
+      paddingVertical: 4,
+    },
+
+    desktopPaidBadge: {
+      backgroundColor: colors.successBg,
+    },
+
+    desktopPendingBadge: {
+      backgroundColor: colors.warningBg,
+    },
+
+    desktopStatusDot: {
+      width: 5,
+      height: 5,
+      borderRadius: 10,
+      marginRight: 5,
+    },
+
+    desktopPaidDot: {
+      backgroundColor: colors.success,
+    },
+
+    desktopPendingDot: {
+      backgroundColor: colors.warning,
+    },
+
+    desktopStatusText: {
+      fontSize: 7,
+      fontWeight: "800",
+    },
+
+    desktopPaidText: {
+      color: colors.success,
+    },
+
+    desktopPendingText: {
+      color: colors.warning,
+    },
+
+    commentCell: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      minWidth: 0,
+      gap: 5,
+    },
+
+    commentText: {
+      flex: 1,
+      fontSize: 9,
+      color: colors.textMuted,
+    },
+
+    noCommentText: {
+      fontSize: 10,
+      color: colors.textFaint,
+    },
+
+    amountCell: {
+      width: 100,
+      alignItems: "flex-end",
+    },
+
+    amountText: {
+      fontSize: 11,
+      color: colors.textPrimary,
+      fontWeight: "800",
+    },
+
+    actionsCell: {
+      width: 82,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+
+    tableActionButton: {
+      width: 34,
+      height: 34,
+
+      borderRadius: 9,
+
+      backgroundColor: colors.statBlueBg,
 
       alignItems: "center",
+      justifyContent: "center",
+
+      position: "relative",
+
+      zIndex: 20,
+
+      elevation: 20,
+
+      cursor: "pointer",
+    },
+
+    tableDeleteButton: {
+      backgroundColor: colors.dangerBg,
+    },
+
+    // ========================================================
+    // DESKTOP EMPTY STATE
+    // ========================================================
+
+    desktopEmptyCard: {
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 14,
+      minHeight: 220,
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 25,
+    },
+
+    desktopEmptyIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 14,
+      backgroundColor: colors.bg,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 10,
+    },
+
+    desktopEmptyTitle: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    desktopEmptySubtitle: {
+      marginTop: 4,
+      fontSize: 10,
+      color: colors.textMuted,
+      textAlign: "center",
+    },
+  });
+}
+
+// ============================================================
+// DESKTOP BILLING STYLES
+// ============================================================
+
+function createDesktopBillingStyles(colors) {
+  return StyleSheet.create({
+    // ========================================================
+    // LOADING
+    // ========================================================
+
+    loadingContainer: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.bg,
+    },
+
+    loadingText: {
+      marginTop: 8,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+
+    // ========================================================
+    // MAIN DESKTOP SCROLL
+    // ========================================================
+
+    scroll: {
+      flex: 1,
+      backgroundColor: colors.bg,
+    },
+
+    scrollContent: {
+      paddingHorizontal: 18,
+      paddingTop: 16,
+      paddingBottom: 28,
+    },
+
+    // ========================================================
+    // PERIOD TOOLBAR
+    // ========================================================
+
+    periodToolbar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 14,
+      minHeight: 42,
+    },
+
+    periodLabel: {
+      fontSize: 16,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    periodDescription: {
+      marginTop: 3,
+      fontSize: 10,
+      color: colors.textSecondary,
+    },
+
+    periodActions: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+
+    periodButton: {
+      height: 36,
+      minWidth: 140,
+      paddingHorizontal: 11,
+      borderRadius: 9,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+    },
+
+    periodButtonText: {
+      fontSize: 10,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+
+    addExpenseButton: {
+      height: 36,
+      paddingHorizontal: 12,
+      borderRadius: 9,
+      backgroundColor: colors.primaryBlue,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+    },
+
+    addExpenseButtonText: {
+      color: "#fff",
+      fontSize: 10,
+      fontWeight: "700",
+    },
+
+    // ========================================================
+    // SUMMARY CARDS
+    // ========================================================
+
+    summaryGrid: {
+      flexDirection: "row",
+      gap: 10,
+      marginBottom: 14,
+    },
+
+    desktopSummaryCard: {
+      flex: 1,
+      height: 88,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+
+    desktopSummaryTop: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+
+    desktopSummaryLabel: {
+      fontSize: 10,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+
+    desktopSummaryValue: {
+      marginTop: 6,
+      fontSize: 18,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    desktopSummaryIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 9,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    // ========================================================
+    // FINANCIAL OVERVIEW
+    // ========================================================
+
+    desktopOverviewCard: {
+      backgroundColor: colors.card,
+      borderRadius: 13,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+      marginBottom: 14,
+    },
+
+    desktopOverviewHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+
+    desktopOverviewTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    desktopOverviewSubtitle: {
+      marginTop: 2,
+      fontSize: 9,
+      color: colors.textSecondary,
+    },
+
+    desktopPeriodButton: {
+      height: 32,
+      paddingHorizontal: 9,
+      borderRadius: 8,
+      backgroundColor: colors.statBlueBg,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+
+    desktopPeriodButtonText: {
+      fontSize: 9,
+      fontWeight: "700",
+      color: colors.primaryBlue,
+    },
+
+    desktopChartLoading: {
+      height: 180,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    // --------------------------------------------------------
+    // CHART BODY
+    // --------------------------------------------------------
+
+    desktopOverviewBody: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: 155,
+      maxHeight: 165,
+    },
+
+    desktopBreakdownList: {
+      flex: 1,
+      marginLeft: 20,
+      justifyContent: "center",
+    },
+
+    desktopBreakdownRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      minHeight: 26,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+
+    desktopBreakdownDot: {
+      width: 7,
+      height: 7,
+      borderRadius: 4,
+      marginRight: 8,
+    },
+
+    desktopBreakdownName: {
+      flex: 1,
+      fontSize: 10,
+      fontWeight: "600",
+      color: colors.textSecondary,
+    },
+
+    desktopBreakdownPercent: {
+      width: 45,
+      textAlign: "right",
+      fontSize: 9,
+      fontWeight: "600",
+      color: colors.textMuted,
+    },
+
+    desktopBreakdownAmount: {
+      width: 70,
+      textAlign: "right",
+      fontSize: 10,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    desktopProfitText: {
+      color: colors.success,
+    },
+
+    desktopNoData: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    desktopNoDataText: {
+      marginTop: 7,
+      maxWidth: 220,
+      textAlign: "center",
+      fontSize: 10,
+      lineHeight: 14,
+      color: colors.textFaint,
+    },
+
+    // ========================================================
+    // FINANCE STRIP
+    // ========================================================
+
+    desktopFinanceStrip: {
+      marginTop: 8,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
+      flexDirection: "row",
+      alignItems: "center",
+    },
+
+    desktopFinanceItem: {
+      flex: 1,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    desktopFinanceDivider: {
+      width: 1,
+      height: 38,
+      backgroundColor: colors.borderLight,
+      marginHorizontal: 12,
+    },
+
+    desktopFinanceLabel: {
+      fontSize: 8,
+      color: colors.textFaint,
+      marginBottom: 3,
+    },
+
+    desktopFinanceExpense: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.danger,
+    },
+
+    desktopFinanceProfit: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.success,
+    },
+
+    desktopFinanceLoss: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.danger,
+    },
+
+    desktopFinanceRevenue: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.primaryBlue,
+    },
+
+    desktopFinanceHint: {
+      marginTop: 2,
+      fontSize: 7,
+      color: colors.textFaint,
+    },
+
+    // ========================================================
+    // EXPENSE SECTION
+    // ========================================================
+
+    expensesSection: {
+      backgroundColor: colors.card,
+      borderRadius: 13,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: 14,
+    },
+
+    expensesSectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: 10,
+    },
+
+    expensesTitle: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    expensesSubtitle: {
+      marginTop: 2,
+      fontSize: 9,
+      color: colors.textSecondary,
+    },
+
+    sectionAddButton: {
+      height: 32,
+      paddingHorizontal: 10,
+      borderRadius: 8,
+      backgroundColor: colors.primaryBlue,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 5,
+    },
+
+    sectionAddButtonText: {
+      color: "#fff",
+      fontSize: 9,
+      fontWeight: "700",
+    },
+
+    // ========================================================
+    // EXPENSE TABLE
+    // ========================================================
+
+    expenseTable: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      overflow: "hidden",
+    },
+
+    expenseTableHeader: {
+      height: 34,
+      paddingHorizontal: 11,
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.borderLight,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+
+    tableHeaderText: {
+      fontSize: 7,
+      fontWeight: "800",
+      color: colors.textFaint,
+      textTransform: "uppercase",
+      letterSpacing: 0.3,
+    },
+
+    expenseTableRow: {
+      minHeight: 52,
+      paddingHorizontal: 11,
+      flexDirection: "row",
+      alignItems: "center",
+      borderBottomWidth: 1,
+      borderBottomColor: colors.borderLight,
+    },
+
+    expenseTableRowLast: {
+      borderBottomWidth: 0,
+    },
+
+    categoryColumn: {
+      width: "23%",
+    },
+
+    dateColumn: {
+      width: "15%",
+    },
+
+    statusColumn: {
+      width: "13%",
+    },
+
+    commentColumn: {
+      flex: 1,
+    },
+
+    amountColumn: {
+      width: 80,
+      textAlign: "right",
+    },
+
+    actionColumn: {
+      width: 62,
+      textAlign: "right",
+    },
+
+    categoryCell: {
+      width: "23%",
+      flexDirection: "row",
+      alignItems: "center",
+      paddingRight: 8,
+    },
+
+    categoryIcon: {
+      width: 27,
+      height: 27,
+      borderRadius: 8,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 7,
+    },
+
+    categoryText: {
+      flex: 1,
+      fontSize: 9,
+      fontWeight: "700",
+      color: colors.textPrimary,
+    },
+
+    dateCell: {
+      width: "15%",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingRight: 5,
+    },
+
+    dateText: {
+      fontSize: 8,
+      color: colors.textSecondary,
+    },
+
+    statusCell: {
+      width: "13%",
+    },
+
+    desktopStatusBadge: {
+      alignSelf: "flex-start",
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingHorizontal: 6,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+
+    desktopPaidBadge: {
+      backgroundColor: colors.successBg,
+    },
+
+    desktopPendingBadge: {
+      backgroundColor: colors.warningBg,
+    },
+
+    desktopStatusDot: {
+      width: 4,
+      height: 4,
+      borderRadius: 3,
+    },
+
+    desktopPaidDot: {
+      backgroundColor: colors.success,
+    },
+
+    desktopPendingDot: {
+      backgroundColor: colors.warning,
+    },
+
+    desktopStatusText: {
+      fontSize: 7,
+      fontWeight: "800",
+    },
+
+    desktopPaidText: {
+      color: colors.success,
+    },
+
+    desktopPendingText: {
+      color: colors.warning,
+    },
+
+    commentCell: {
+      flex: 1,
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      paddingRight: 6,
+      minWidth: 0,
+    },
+
+    commentText: {
+      flex: 1,
+      fontSize: 8,
+      color: colors.textSecondary,
+    },
+
+    noCommentText: {
+      fontSize: 9,
+      color: colors.textFaint,
+    },
+
+    amountCell: {
+      width: 80,
+      alignItems: "flex-end",
+    },
+
+    amountText: {
+      fontSize: 9,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    actionsCell: {
+      width: 82,
+
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
 
       gap: 6,
 
-      marginTop: 15,
+      position: "relative",
 
-      paddingTop: 12,
+      zIndex: 30,
 
-      borderTopWidth: 1,
-
-      borderTopColor: colors.borderLight,
+      elevation: 30,
     },
 
-    periodFooterText: {
-      flex: 1,
+    tableActionButton: {
+      width: 25,
+      height: 25,
+      borderRadius: 7,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.card,
+      alignItems: "center",
+      justifyContent: "center",
+    },
 
-      fontSize: 10,
+    tableDeleteButton: {
+      backgroundColor: colors.dangerBg,
+      borderColor: colors.dangerBg,
+    },
 
+    // ========================================================
+    // EMPTY
+    // ========================================================
+
+    desktopEmptyCard: {
+      minHeight: 170,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 10,
+      backgroundColor: colors.borderLight,
+    },
+
+    desktopEmptyIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 11,
+      backgroundColor: colors.card,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 8,
+    },
+
+    desktopEmptyTitle: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: colors.textPrimary,
+    },
+
+    desktopEmptySubtitle: {
+      marginTop: 3,
+      fontSize: 9,
       color: colors.textFaint,
+    },
 
-      lineHeight: 15,
+    // ========================================================
+    // DESKTOP DONUT
+    // ========================================================
+
+    donutWrap: {
+      width: 160,
+      height: 160,
+      alignItems: "center",
+      justifyContent: "center",
+      position: "relative",
+    },
+
+    donutCenter: {
+      position: "absolute",
+      width: 100,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    donutCenterIcon: {
+      width: 21,
+      height: 21,
+      borderRadius: 7,
+      backgroundColor: colors.successBg,
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 3,
+    },
+
+    donutCenterAmount: {
+      fontSize: 14,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      textAlign: "center",
+    },
+
+    donutCenterLabel: {
+      fontSize: 6,
+      fontWeight: "800",
+      color: colors.textFaint,
+      marginTop: 2,
+      textAlign: "center",
+      letterSpacing: 0.3,
+    },
+
+    donutEmpty: {
+      width: 160,
+      height: 160,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    emptyDonutRing: {
+      width: 135,
+      height: 135,
+      borderRadius: 70,
+      borderWidth: 22,
+      borderColor: colors.borderLight,
+    },
+
+    donutEmptyAmount: {
+      fontSize: 13,
+      fontWeight: "800",
+      color: colors.textPrimary,
+      marginTop: 4,
     },
   });
 }

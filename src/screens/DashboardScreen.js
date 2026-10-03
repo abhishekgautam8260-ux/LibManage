@@ -1,4 +1,4 @@
-import React, { useCallback, useState, useMemo } from "react";
+import React, { useCallback, useState, useMemo, useEffect } from "react";
 
 import {
   View,
@@ -12,6 +12,7 @@ import {
   Modal,
   TextInput,
   useWindowDimensions,
+  Platform,
 } from "react-native";
 import SeatActionModal from "../components/SeatActionModal";
 
@@ -21,6 +22,7 @@ import SeatHoldAlertItem from "../components/SeatHoldAlertItem";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 
 import Header from "../components/Header";
+import DesktopDashboard from "../components/DesktopDashboard";
 import SeatGrid from "../components/SeatGrid";
 import BookingModal from "../components/BookingModal";
 import StudentDetailModal from "../components/StudentDetailModal";
@@ -156,7 +158,11 @@ function isStudentExpired(dateString) {
 // ============================================================
 
 export default function DashboardScreen() {
+  const { width } = useWindowDimensions();
+
+  const isDesktopWeb = Platform.OS === "web" && width >= 1024;
   const navigation = useNavigation();
+  const { width: screenWidth } = useWindowDimensions();
 
   const { isDarkMode } = useTheme();
 
@@ -166,7 +172,69 @@ export default function DashboardScreen() {
 
   const { libraryId, canEditStudent, canManageSeats } = useAuth();
 
-  const { width } = useWindowDimensions();
+  const isDesktop = Platform.OS === "web" && width >= 1024;
+  useEffect(() => {
+    if (Platform.OS !== "web") {
+      return;
+    }
+
+    const parent = navigation.getParent();
+
+    if (!parent) {
+      return;
+    }
+
+    if (isDesktop) {
+      // ========================================================
+      // DESKTOP WEB
+      // Hide bottom tab bar
+      // ========================================================
+
+      parent.setOptions({
+        tabBarStyle: {
+          display: "none",
+        },
+      });
+    } else {
+      // ========================================================
+      // MOBILE WEB
+      // Restore the same tab bar design used by MainTabs
+      // ========================================================
+
+      parent.setOptions({
+        tabBarStyle: {
+          height: 64,
+
+          paddingBottom: 8,
+          paddingTop: 6,
+
+          backgroundColor: isDarkMode ? darkColors.card : lightColors.card,
+
+          borderTopColor: isDarkMode ? darkColors.border : lightColors.border,
+
+          borderTopWidth: 1,
+        },
+      });
+    }
+
+    return () => {
+      // Restore normal tab bar styling when leaving Dashboard
+      parent.setOptions({
+        tabBarStyle: {
+          height: 64,
+
+          paddingBottom: 8,
+          paddingTop: 6,
+
+          backgroundColor: isDarkMode ? darkColors.card : lightColors.card,
+
+          borderTopColor: isDarkMode ? darkColors.border : lightColors.border,
+
+          borderTopWidth: 1,
+        },
+      });
+    };
+  }, [navigation, isDesktop, isDarkMode]);
 
   // ==========================================================
   // DASHBOARD DATA
@@ -184,6 +252,10 @@ export default function DashboardScreen() {
   const [seats, setSeats] = useState([]);
 
   const [alerts, setAlerts] = useState([]);
+
+  const [vacateConfirmVisible, setVacateConfirmVisible] = useState(false);
+  const [vacateConfirmSeat, setVacateConfirmSeat] = useState(null);
+
   const [activeSeatHolds, setActiveSeatHolds] = useState([]);
 
   const [showAllAlerts, setShowAllAlerts] = useState(false);
@@ -419,6 +491,7 @@ export default function DashboardScreen() {
      * from VACANT → HELD.
      */
     try {
+      await loadAll();
       if (libraryId) {
         const updatedSeats = await getSeats(libraryId);
 
@@ -455,17 +528,108 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleBookHeldSeat = (seat) => {
+  const handleBookHeldSeat = async (seat) => {
+    console.log("📚 Booking held seat:", seat);
+
     if (!seat) {
+      console.log("❌ No held seat received");
       return;
     }
 
-    console.log("📚 Booking held seat:", seat);
+    if (!canManageSeats) {
+      Alert.alert(
+        "Access Restricted",
+        "You don't have permission to book seats."
+      );
+      return;
+    }
 
-    setHeldSeatModalVisible(false);
-    setSelectedHeldSeat(seat);
-    setBookingSeat(seat.seatNumber);
-    setBookingModalVisible(true);
+    if (!libraryId) {
+      Alert.alert("Error", "Library not loaded. Please refresh.");
+      return;
+    }
+
+    const seatNumber = seat.seatNumber;
+    const name = seat.holdName;
+    const phone = seat.holdPhone;
+    const holdId = seat.holdId;
+
+    if (!seatNumber || !name || !phone || !holdId) {
+      console.log("❌ Missing held seat information:", {
+        seatNumber,
+        name,
+        phone,
+        holdId,
+      });
+
+      Alert.alert("Booking Error", "Required hold information is missing.");
+
+      return;
+    }
+
+    try {
+      setBookingLoading(true);
+
+      console.log("🚀 Converting held seat into booking:", {
+        libraryId,
+        seatNumber,
+        name,
+        phone,
+        holdId,
+      });
+
+      await bookSeat({
+        libraryId,
+        seatNumber,
+        name,
+        phone,
+
+        // Your current monthly/full-day price
+        amountPaid: 700,
+
+        studentType: "FULL_DAY",
+
+        // VERY IMPORTANT:
+        // This connects the booking with the existing hold.
+        holdId,
+      });
+
+      console.log(`✅ Seat ${seatNumber} booked successfully`);
+
+      // Close held-seat modal
+      setHeldSeatModalVisible(false);
+
+      // Clear selected hold
+      setSelectedHeldSeat(null);
+
+      // Clear booking seat
+      setBookingSeat(null);
+
+      // Refresh dashboard + seats + alerts
+      await loadAll();
+
+      Alert.alert(
+        "Booking Successful",
+        `Seat ${seatNumber} has been booked successfully.`
+      );
+    } catch (err) {
+      console.error("❌ Held seat booking failed:", {
+        status: err?.response?.status,
+        url: err?.config?.url,
+        response: err?.response?.data,
+        message: err?.message,
+      });
+
+      Alert.alert(
+        "Booking Failed",
+        err?.response?.data?.message ||
+          err?.response?.data?.error ||
+          err?.message ||
+          "Unable to book this seat."
+      );
+    } finally {
+      setBookingLoading(false);
+    }
   };
 
   // ============================================================
@@ -854,231 +1018,267 @@ export default function DashboardScreen() {
         backgroundColor: colors.bg,
       }}
     >
-      {/* ======================================================
-          HEADER
-          ====================================================== */}
-
-      <Header />
-
-      <ScrollView
-        contentContainerStyle={{
-          padding: spacing.md,
-          paddingBottom: 40,
-        }}
-        refreshControl={
-          <RefreshControl
+      {isDesktopWeb ? (
+        <>
+          <DesktopDashboard
+            navigation={navigation}
+            stats={stats}
+            seats={seats}
+            combinedAlerts={combinedAlerts}
+            visibleAlerts={visibleAlerts}
+            showAllAlerts={showAllAlerts}
+            setShowAllAlerts={setShowAllAlerts}
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.primaryBlue}
-          />
-        }
-      >
-        {/* ====================================================
-            STAT CARDS
-            ==================================================== */}
-
-        <View style={styles.statGrid}>
-          {/* TOTAL SEATS */}
-
-          <TouchableOpacity
-            style={styles.statCardWrapper}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate("Students")}
-          >
-            <StatCard
-              title="Total Seats"
-              value={stats.totalSeats}
-              sub="Library capacity"
-              icon="chair"
-              bg={colors.statPurpleBg}
-              color={colors.statPurple}
-              styles={styles}
-            />
-          </TouchableOpacity>
-
-          {/* SEATS FILLED */}
-
-          <TouchableOpacity
-            style={styles.statCardWrapper}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate("Students")}
-          >
-            <StatCard
-              title="Seats Filled"
-              value={stats.filledSeats}
-              sub="Full day active"
-              icon="user"
-              bg={colors.statOrangeBg}
-              color={colors.statOrange}
-              styles={styles}
-            />
-          </TouchableOpacity>
-
-          {/* SEATS VACANT */}
-
-          <TouchableOpacity
-            style={styles.statCardWrapper}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate("Students")}
-          >
-            <StatCard
-              title="Seats Vacant"
-              value={stats.vacantSeats}
-              sub="Available"
-              icon="check"
-              bg={colors.statGreenBg}
-              color={colors.statGreen}
-              styles={styles}
-            />
-          </TouchableOpacity>
-
-          {/* HALF DAY */}
-
-          <TouchableOpacity
-            style={styles.statCardWrapper}
-            activeOpacity={0.85}
-            onPress={() => navigation.navigate("HalfDayStudents")}
-          >
-            <StatCard
-              title="Half Day Students"
-              value={stats.halfDayStudents}
-              sub="Morning / Evening"
-              icon="clock"
-              bg={colors.statBlueBg}
-              color={colors.statBlue}
-              styles={styles}
-            />
-          </TouchableOpacity>
-        </View>
-
-        {/* ====================================================
-            SUBSCRIPTION ALERTS
-            ==================================================== */}
-
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Subscription Alerts</Text>
-
-          <Text style={styles.cardSubtitle}>Pending actions for students</Text>
-
-          {visibleAlerts.length === 0 ? (
-            <Text style={styles.emptyText}>No pending alerts</Text>
-          ) : (
-            <View style={styles.alertSliderWrapper}>
-              <ScrollView
-                horizontal
-                pagingEnabled={false}
-                showsHorizontalScrollIndicator={false}
-                nestedScrollEnabled
-                decelerationRate="fast"
-                snapToInterval={width * 0.82 + 12}
-                snapToAlignment="start"
-                contentContainerStyle={styles.alertSliderContent}
-              >
-                {visibleAlerts.map((item, index) => (
-                  <View
-                    key={
-                      item.alertType === "SEAT_HOLD_ACTIVE"
-                        ? `active-hold-${item.id}`
-                        : item.alertType === "SEAT_HOLD_EXPIRED"
-                        ? `expired-hold-${item.id}`
-                        : `student-${
-                            item.id ?? `${item.seatNumber}-${item.phone}`
-                          }`
-                    }
-                    style={[
-                      styles.alertSlide,
-                      {
-                        width: width * 0.82,
-                      },
-                    ]}
-                  >
-                    {item.alertType === "SEAT_HOLD_ACTIVE" ? (
-                      <SeatHoldAlertItem
-                        alert={item}
-                        onPress={() => {
-                          const matchingSeat = seats.find(
-                            (seat) => seat.seatNumber === item.seatNumber
-                          );
-
-                          if (matchingSeat) {
-                            setSelectedHeldSeat(matchingSeat);
-                            setHeldSeatModalVisible(true);
-                          }
-                        }}
-                      />
-                    ) : item.alertType === "SEAT_HOLD_EXPIRED" ? (
-                      <SeatHoldAlertItem alert={item} onPress={() => {}} />
-                    ) : (
-                      <AlertItem
-                        student={item}
-                        onPress={() => handleAlertStudentPress(item)}
-                      />
-                    )}
-                  </View>
-                ))}
-              </ScrollView>
-            </View>
-          )}
-
-          {alerts.length > 3 && (
-            <TouchableOpacity onPress={() => setShowAllAlerts(!showAllAlerts)}>
-              <Text style={styles.viewAll}>
-                {showAllAlerts ? "Show Less" : "View All Alerts"}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-
-        {/* ====================================================
-            SEAT LAYOUT
-            ==================================================== */}
-
-        <View
-          style={[
-            styles.card,
-            {
-              marginTop: spacing.md,
-            },
-          ]}
-        >
-          <View style={styles.seatHeader}>
-            <View>
-              <Text style={styles.cardTitle}>Seat Layout</Text>
-
-              <Text style={styles.cardSubtitle}>
-                Fill here your fav seat...
-              </Text>
-            </View>
-          </View>
-
-          {/* LEGEND */}
-
-          <View style={styles.legend}>
-            <View style={styles.legendItem}>
-              <FontAwesome6 name="circle" size={8} color={colors.textFaint} />
-
-              <Text style={styles.legendText}>Booked</Text>
-            </View>
-
-            <View style={styles.legendItem}>
-              <FontAwesome6
-                name="circle"
-                size={8}
-                color={colors.primaryGreen}
-              />
-
-              <Text style={styles.legendText}>Vacant</Text>
-            </View>
-          </View>
-
-          <SeatGrid
-            seats={seats}
+            canManageSeats={canManageSeats}
             onVacantPress={handleVacantPress}
             onOccupiedPress={handleOccupiedPress}
             onHeldPress={handleHeldPress}
+            onAlertStudentPress={handleAlertStudentPress}
+            onActiveHoldPress={(item) => {
+              const matchingSeat = seats.find(
+                (seat) => seat.seatNumber === item.seatNumber
+              );
+
+              if (matchingSeat) {
+                setSelectedHeldSeat(matchingSeat);
+                setHeldSeatModalVisible(true);
+              }
+            }}
           />
-        </View>
-      </ScrollView>
+        </>
+      ) : (
+        <>
+          <Header />
+          <ScrollView
+            contentContainerStyle={{
+              padding: spacing.md,
+              paddingBottom: 40,
+            }}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                tintColor={colors.primaryBlue}
+              />
+            }
+          >
+            {/* ====================================================
+            STAT CARDS
+            ==================================================== */}
+
+            <View style={styles.statGrid}>
+              {/* TOTAL SEATS */}
+
+              <TouchableOpacity
+                style={styles.statCardWrapper}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate("Students")}
+              >
+                <StatCard
+                  title="Total Seats"
+                  value={stats.totalSeats}
+                  sub="Library capacity"
+                  icon="chair"
+                  bg={colors.statPurpleBg}
+                  color={colors.statPurple}
+                  styles={styles}
+                />
+              </TouchableOpacity>
+
+              {/* SEATS FILLED */}
+
+              <TouchableOpacity
+                style={styles.statCardWrapper}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate("Students")}
+              >
+                <StatCard
+                  title="Seats Filled"
+                  value={stats.filledSeats}
+                  sub="Full day active"
+                  icon="user"
+                  bg={colors.statOrangeBg}
+                  color={colors.statOrange}
+                  styles={styles}
+                />
+              </TouchableOpacity>
+
+              {/* SEATS VACANT */}
+
+              <TouchableOpacity
+                style={styles.statCardWrapper}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate("Students")}
+              >
+                <StatCard
+                  title="Seats Vacant"
+                  value={stats.vacantSeats}
+                  sub="Available"
+                  icon="check"
+                  bg={colors.statGreenBg}
+                  color={colors.statGreen}
+                  styles={styles}
+                />
+              </TouchableOpacity>
+
+              {/* HALF DAY */}
+
+              <TouchableOpacity
+                style={styles.statCardWrapper}
+                activeOpacity={0.85}
+                onPress={() => navigation.navigate("HalfDayStudents")}
+              >
+                <StatCard
+                  title="Half Day Students"
+                  value={stats.halfDayStudents}
+                  sub="Morning / Evening"
+                  icon="clock"
+                  bg={colors.statBlueBg}
+                  color={colors.statBlue}
+                  styles={styles}
+                />
+              </TouchableOpacity>
+            </View>
+
+            {/* ====================================================
+            SUBSCRIPTION ALERTS
+            ==================================================== */}
+
+            <View style={styles.card}>
+              <Text style={styles.cardTitle}>Subscription Alerts</Text>
+
+              <Text style={styles.cardSubtitle}>
+                Pending actions for students
+              </Text>
+
+              {visibleAlerts.length === 0 ? (
+                <Text style={styles.emptyText}>No pending alerts</Text>
+              ) : (
+                <View style={styles.alertSliderWrapper}>
+                  <ScrollView
+                    horizontal
+                    pagingEnabled={false}
+                    showsHorizontalScrollIndicator={false}
+                    nestedScrollEnabled
+                    decelerationRate="fast"
+                    snapToInterval={width * 0.82 + 12}
+                    snapToAlignment="start"
+                    contentContainerStyle={styles.alertSliderContent}
+                  >
+                    {visibleAlerts.map((item, index) => (
+                      <View
+                        key={
+                          item.alertType === "SEAT_HOLD_ACTIVE"
+                            ? `active-hold-${item.id}`
+                            : item.alertType === "SEAT_HOLD_EXPIRED"
+                            ? `expired-hold-${item.id}`
+                            : `student-${
+                                item.id ?? `${item.seatNumber}-${item.phone}`
+                              }`
+                        }
+                        style={[
+                          styles.alertSlide,
+                          {
+                            width: width * 0.82,
+                          },
+                        ]}
+                      >
+                        {item.alertType === "SEAT_HOLD_ACTIVE" ? (
+                          <SeatHoldAlertItem
+                            alert={item}
+                            onPress={() => {
+                              const matchingSeat = seats.find(
+                                (seat) => seat.seatNumber === item.seatNumber
+                              );
+
+                              if (matchingSeat) {
+                                setSelectedHeldSeat(matchingSeat);
+                                setHeldSeatModalVisible(true);
+                              }
+                            }}
+                          />
+                        ) : item.alertType === "SEAT_HOLD_EXPIRED" ? (
+                          <SeatHoldAlertItem alert={item} onPress={() => {}} />
+                        ) : (
+                          <AlertItem
+                            student={item}
+                            onPress={() => handleAlertStudentPress(item)}
+                          />
+                        )}
+                      </View>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+
+              {alerts.length > 3 && (
+                <TouchableOpacity
+                  onPress={() => setShowAllAlerts(!showAllAlerts)}
+                >
+                  <Text style={styles.viewAll}>
+                    {showAllAlerts ? "Show Less" : "View All Alerts"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* ====================================================
+            SEAT LAYOUT
+            ==================================================== */}
+
+            <View
+              style={[
+                styles.card,
+                {
+                  marginTop: spacing.md,
+                },
+              ]}
+            >
+              <View style={styles.seatHeader}>
+                <View>
+                  <Text style={styles.cardTitle}>Seat Layout</Text>
+
+                  <Text style={styles.cardSubtitle}>
+                    Fill here your fav seat...
+                  </Text>
+                </View>
+              </View>
+
+              {/* LEGEND */}
+
+              <View style={styles.legend}>
+                <View style={styles.legendItem}>
+                  <FontAwesome6
+                    name="circle"
+                    size={8}
+                    color={colors.textFaint}
+                  />
+
+                  <Text style={styles.legendText}>Booked</Text>
+                </View>
+
+                <View style={styles.legendItem}>
+                  <FontAwesome6
+                    name="circle"
+                    size={8}
+                    color={colors.primaryGreen}
+                  />
+
+                  <Text style={styles.legendText}>Vacant</Text>
+                </View>
+              </View>
+
+              <SeatGrid
+                seats={seats}
+                onVacantPress={handleVacantPress}
+                onOccupiedPress={handleOccupiedPress}
+                onHeldPress={handleHeldPress}
+              />
+            </View>
+          </ScrollView>
+        </>
+      )}
 
       {/* ======================================================
           BOOKING MODAL
@@ -1159,7 +1359,12 @@ export default function DashboardScreen() {
         onRequestClose={() => setSelectedAlertStudent(null)}
       >
         <View style={styles.alertModalOverlay}>
-          <View style={styles.alertModalContainer}>
+          <View
+            style={[
+              styles.alertModalContainer,
+              isDesktop && styles.alertModalContainerDesktop,
+            ]}
+          >
             {/* HEADER */}
 
             <View style={styles.alertModalHeader}>
@@ -1302,35 +1507,19 @@ export default function DashboardScreen() {
                     style={styles.vacateAlertButton}
                     disabled={alertActionLoading}
                     onPress={() => {
+                      console.log("🚨 VACATE BUTTON CLICKED");
+
                       if (!selectedAlertStudent) {
                         return;
                       }
 
-                      Alert.alert(
-                        "Vacate Seat",
-                        `Are you sure you want to vacate Seat ${selectedAlertStudent.seatNumber}?`,
-                        [
-                          {
-                            text: "Cancel",
-                            style: "cancel",
-                          },
-                          {
-                            text: "Vacate",
-                            style: "destructive",
-                            onPress: async () => {
-                              setAlertActionLoading(true);
-
-                              try {
-                                await handleVacate(
-                                  selectedAlertStudent.seatNumber
-                                );
-                              } finally {
-                                setAlertActionLoading(false);
-                              }
-                            },
-                          },
-                        ]
+                      console.log(
+                        "🚨 Opening vacate confirmation for seat:",
+                        selectedAlertStudent.seatNumber
                       );
+
+                      setVacateConfirmSeat(selectedAlertStudent.seatNumber);
+                      setVacateConfirmVisible(true);
                     }}
                   >
                     <FontAwesome6
@@ -1438,6 +1627,80 @@ export default function DashboardScreen() {
                 </View>
               </View>
             )}
+            {vacateConfirmVisible && (
+              <View style={styles.vacateConfirmOverlay}>
+                <View style={styles.vacateConfirmContainer}>
+                  <View style={styles.vacateConfirmIcon}>
+                    <FontAwesome6
+                      name="triangle-exclamation"
+                      size={22}
+                      color={colors.danger}
+                    />
+                  </View>
+
+                  <Text style={styles.vacateConfirmTitle}>Vacate Seat</Text>
+
+                  <Text style={styles.vacateConfirmMessage}>
+                    Are you sure you want to vacate Seat {vacateConfirmSeat}?
+                  </Text>
+
+                  <View style={styles.vacateConfirmActions}>
+                    <TouchableOpacity
+                      style={styles.vacateConfirmCancel}
+                      disabled={alertActionLoading}
+                      onPress={() => {
+                        console.log("🚨 VACATE CANCELLED");
+
+                        setVacateConfirmVisible(false);
+                        setVacateConfirmSeat(null);
+                      }}
+                    >
+                      <Text style={styles.vacateConfirmCancelText}>Cancel</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.vacateConfirmButton}
+                      disabled={alertActionLoading}
+                      onPress={async () => {
+                        console.log(
+                          "🚨 CONFIRM VACATE CLICKED:",
+                          vacateConfirmSeat
+                        );
+
+                        setAlertActionLoading(true);
+
+                        try {
+                          await handleVacate(vacateConfirmSeat);
+
+                          console.log(
+                            "✅ Seat vacated successfully:",
+                            vacateConfirmSeat
+                          );
+
+                          setVacateConfirmVisible(false);
+                          setVacateConfirmSeat(null);
+                        } catch (error) {
+                          console.error(
+                            "❌ Vacate confirmation failed:",
+                            error
+                          );
+                        } finally {
+                          setAlertActionLoading(false);
+                        }
+                      }}
+                    >
+                      {alertActionLoading ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                      ) : (
+                        <Text style={styles.vacateConfirmButtonText}>
+                          Vacate
+                        </Text>
+                      )}
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
           </View>
         </View>
       </Modal>
@@ -1480,6 +1743,113 @@ function StatCard({ title, value, sub, icon, bg, color, styles }) {
 
 function createStyles(colors) {
   return StyleSheet.create({
+    vacateConfirmOverlay: {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: "rgba(0, 0, 0, 0.45)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 9999,
+    },
+
+    vacateConfirmContainer: {
+      width: "90%",
+      maxWidth: 420,
+
+      // Use your card/surface color instead of page background
+      backgroundColor: colors.card,
+
+      borderRadius: 18,
+      padding: 24,
+      alignItems: "center",
+
+      shadowColor: "#000",
+      shadowOffset: {
+        width: 0,
+        height: 8,
+      },
+      shadowOpacity: 0.25,
+      shadowRadius: 20,
+      elevation: 12,
+    },
+    vacateConfirmTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.textPrimary,
+      marginBottom: 8,
+    },
+    vacateConfirmMessage: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: 24,
+    },
+
+    vacateConfirmIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: "rgba(220, 38, 38, 0.10)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 14,
+    },
+
+    vacateConfirmTitle: {
+      fontSize: 20,
+      fontWeight: "700",
+      color: colors.text,
+      marginBottom: 8,
+    },
+
+    vacateConfirmMessage: {
+      fontSize: 15,
+      color: colors.textSecondary,
+      textAlign: "center",
+      lineHeight: 22,
+      marginBottom: 24,
+    },
+
+    vacateConfirmActions: {
+      flexDirection: "row",
+      width: "100%",
+      gap: 12,
+    },
+
+    vacateConfirmCancel: {
+      flex: 1,
+      height: 46,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    vacateConfirmCancelText: {
+      fontSize: 15,
+      fontWeight: "600",
+      color: colors.textSecondary,
+    },
+
+    vacateConfirmButton: {
+      flex: 1,
+      height: 46,
+      borderRadius: 10,
+      backgroundColor: colors.danger,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+
+    vacateConfirmButtonText: {
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#FFFFFF",
+    },
     // ========================================================
     // GENERAL
     // ========================================================
@@ -1663,6 +2033,13 @@ function createStyles(colors) {
       padding: 20,
       maxHeight: "90%",
       position: "relative",
+    },
+    alertModalContainerDesktop: {
+      width: "92%",
+      maxWidth: 900,
+      maxHeight: "88%",
+      padding: 24,
+      borderRadius: 26,
     },
 
     alertModalHeader: {

@@ -118,15 +118,29 @@ export default function HeldSeatModal({
   // ============================================================
 
   const handleBook = () => {
+    console.log("🟢 BOOK BUTTON CLICKED");
+    console.log("🪑 Held seat:", seat);
+    console.log("⏳ Loading:", loading);
+    console.log("📞 onBook exists:", typeof onBook);
+
     if (loading) {
+      console.log("⚠️ Book blocked because loading=true");
       return;
     }
 
-    /*
-     * DashboardScreen will open BookingModal
-     * and pass this hold information.
-     */
-    onBook?.(seat);
+    if (!seat) {
+      console.log("❌ Book blocked: seat is missing");
+      return;
+    }
+
+    if (typeof onBook !== "function") {
+      console.log("❌ Book blocked: onBook callback is missing");
+      return;
+    }
+
+    console.log("🚀 Calling onBook with seat:", seat);
+
+    onBook(seat);
   };
 
   // ============================================================
@@ -340,14 +354,22 @@ export default function HeldSeatModal({
               )}
             </TouchableOpacity>
 
-            <TouchableOpacity
+            <Pressable
               disabled={loading}
-              onPress={handleBook}
-              activeOpacity={0.8}
-              style={styles.bookButton}
+              onPress={() => {
+                console.log("🟢 WEB BOOK BUTTON PRESSED");
+                handleBook();
+              }}
+              style={({ pressed }) => [
+                styles.bookButton,
+                pressed && styles.bookButtonPressed,
+                loading && styles.bookButtonDisabled,
+              ]}
             >
-              <Text style={styles.bookText}>Book This Seat</Text>
-            </TouchableOpacity>
+              <Text style={styles.bookText}>
+                {loading ? "Booking..." : "Book This Seat"}
+              </Text>
+            </Pressable>
           </View>
         </View>
       </View>
@@ -370,6 +392,7 @@ const createStyles = (colors) =>
     backdrop: {
       ...StyleSheet.absoluteFillObject,
       backgroundColor: "rgba(0,0,0,0.55)",
+      zIndex: 0,
     },
 
     panel: {
@@ -377,6 +400,9 @@ const createStyles = (colors) =>
       maxWidth: 440,
 
       backgroundColor: colors.card,
+      position: "relative",
+      zIndex: 10,
+      elevation: 10,
 
       borderRadius: 22,
 
@@ -673,6 +699,21 @@ const createStyles = (colors) =>
       justifyContent: "center",
 
       backgroundColor: colors.primaryGreen,
+
+      position: "relative",
+      zIndex: 20,
+
+      elevation: 20,
+
+      cursor: "pointer",
+    },
+
+    bookButtonPressed: {
+      opacity: 0.75,
+    },
+
+    bookButtonDisabled: {
+      opacity: 0.55,
     },
 
     bookText: {

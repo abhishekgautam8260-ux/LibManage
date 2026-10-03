@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "./config";
 
-const HOST_URL = "http://192.168.31.27:8080";
+// const HOST_URL = "http://192.168.31.27:8080";
+const HOST_URL = BASE_URL;
 // 🔥 IMPORTANT:
 // Replace this with the same backend URL you are already using
 // in your other API files.
@@ -126,13 +128,21 @@ export async function updateEmployee(employeeId, libraryId, payload) {
 export async function updateEmployeeStatus(employeeId, libraryId, active) {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(
-    `${HOST_URL}/api/employees/${employeeId}/library/${libraryId}/status?active=${active}`,
-    {
-      method: "PATCH",
-      headers,
-    }
-  );
+  const url = `${HOST_URL}/api/employees/${employeeId}/library/${libraryId}/status?active=${active}`;
+
+  console.log("🚀 EMPLOYEE STATUS UPDATE");
+  console.log("👤 Employee ID:", employeeId);
+  console.log("🏢 Library ID:", libraryId);
+  console.log("🔄 Active:", active);
+  console.log("🌐 URL:", url);
+  console.log("📡 Method: PATCH");
+
+  const response = await fetch(url, {
+    method: "PATCH",
+    headers,
+  });
+
+  console.log("📥 Status response:", response.status);
 
   return handleResponse(response);
 }
@@ -144,13 +154,20 @@ export async function updateEmployeeStatus(employeeId, libraryId, active) {
 export async function deleteEmployee(employeeId, libraryId) {
   const headers = await getAuthHeaders();
 
-  const response = await fetch(
-    `${HOST_URL}/api/employees/${employeeId}/library/${libraryId}`,
-    {
-      method: "DELETE",
-      headers,
-    }
-  );
+  const url = `${HOST_URL}/api/employees/${employeeId}/library/${libraryId}`;
+
+  console.log("🗑️ DELETE EMPLOYEE API");
+  console.log("👤 Employee ID:", employeeId);
+  console.log("🏢 Library ID:", libraryId);
+  console.log("🌐 URL:", url);
+  console.log("📡 Method: DELETE");
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers,
+  });
+
+  console.log("📥 Delete response:", response.status);
 
   return handleResponse(response);
 }
