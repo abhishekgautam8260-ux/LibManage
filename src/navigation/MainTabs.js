@@ -159,6 +159,10 @@ export default function MainTabs() {
         component={HalfDayStudentsScreen}
         options={{
           title: "Half Day",
+
+          // Hide Half Day from mobile bottom navigation.
+          // Keep the route available for DesktopLayout.
+          tabBarButton: isDesktopWeb ? undefined : () => null,
         }}
       />
 
