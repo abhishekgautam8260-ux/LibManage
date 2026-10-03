@@ -115,7 +115,7 @@ export default function BookingModal({
               onChangeText={setName}
               placeholder="Enter student name"
               placeholderTextColor={colors.textMuted}
-              style={styles.input}
+              style={[styles.input, { fontSize: 16 }]}
               autoCapitalize="words"
             />
 
@@ -130,7 +130,7 @@ export default function BookingModal({
               onChangeText={setPhone}
               placeholder="Enter phone number"
               placeholderTextColor={colors.textMuted}
-              style={styles.input}
+              style={[styles.input, { fontSize: 16 }]}
               keyboardType="phone-pad"
               maxLength={15}
             />
@@ -146,7 +146,7 @@ export default function BookingModal({
               onChangeText={setAmount}
               placeholder="Enter amount"
               placeholderTextColor={colors.textMuted}
-              style={styles.input}
+              style={[styles.input, { fontSize: 16 }]}
               keyboardType="numeric"
             />
 
