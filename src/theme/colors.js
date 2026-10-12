@@ -201,3 +201,51 @@ export const radius = {
   lg: 16,
   pill: 999,
 };
+
+export const typography = {
+  screenTitle: 20,
+  sectionTitle: 18,
+  cardTitle: 16,
+  body: 14,
+  secondary: 13,
+  caption: 12,
+  small: 11,
+};
+
+// ============================================================
+// RESPONSIVE MOBILE SIZES
+// ============================================================
+
+export const mobileSizes = {
+  // Screen
+  screenPadding: 14,
+
+  // Header
+  headerLogo: 42,
+  headerAppName: 18,
+  headerLibraryName: 11,
+
+  // Navigation
+  tabIcon: 17,
+  tabLabel: 10,
+
+  // Typography
+  title: 20,
+  sectionTitle: 16,
+  body: 13,
+  bodySmall: 11,
+  caption: 10,
+
+  // Cards
+  cardPadding: 14,
+  cardRadius: 16,
+
+  // Buttons
+  buttonHeight: 42,
+  buttonRadius: 10,
+
+  // Icons
+  iconSmall: 14,
+  iconMedium: 18,
+  iconLarge: 22,
+};

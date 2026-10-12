@@ -724,11 +724,10 @@ export default function StudentDetailModal({
 ================================================== */}
 
                   <View style={styles.datePickerWrapper}>
-                    {isDesktopWeb ? (
+                    {Platform.OS === "web" ? (
                       <input
                         type="date"
                         value={formatDateForInput(expiryDate)}
-                        min={formatDateForInput(new Date())}
                         onChange={(event) => {
                           const value = event.target.value;
 
@@ -768,8 +767,7 @@ export default function StudentDetailModal({
                       <DateTimePicker
                         value={expiryDate || new Date()}
                         mode="date"
-                        display="spinner"
-                        minimumDate={new Date()}
+                        display={Platform.OS === "ios" ? "spinner" : "calendar"}
                         themeVariant={isDarkMode ? "dark" : "light"}
                         textColor={colors.textPrimary}
                         onChange={(event, selectedDate) => {
@@ -1487,7 +1485,7 @@ function createStyles(colors, isDesktopWeb) {
     datePickerWrapper: {
       width: "100%",
 
-      height: isDesktopWeb ? 52 : 220,
+      height: Platform.OS === "web" ? 52 : 220,
 
       alignItems: "center",
 

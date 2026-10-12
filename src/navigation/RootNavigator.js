@@ -2,6 +2,7 @@ import React from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { View, ActivityIndicator } from "react-native";
 import { useAuth } from "../context/AuthContext";
+import { useSubscription } from "../context/SubscriptionContext";
 import AuthStack from "./AuthStack";
 import MainTabs from "./MainTabs";
 import CreateLibraryScreen from "../screens/CreateLibraryScreen";
@@ -12,8 +13,9 @@ const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
   const { token, hasLibrary, loading } = useAuth();
+  const { subscriptionLoading } = useSubscription();
 
-  if (loading) {
+  if (loading || (token && hasLibrary && subscriptionLoading)) {
     return (
       <View
         style={{

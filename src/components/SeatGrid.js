@@ -24,67 +24,59 @@ export default function SeatGrid({
 
   const { width } = useWindowDimensions();
 
-  /*
-   * IMPORTANT
-   *
-   * Desktop styling is ONLY enabled on web.
-   *
-   * Android/iOS remain exactly the same.
-   */
   const isDesktop = Platform.OS === "web" && width >= 1024;
 
-  const styles = createStyles(colors, isDesktop);
+  const columns = 5;
 
-  // ============================================================
-  // SORT
-  // ============================================================
+  const mobileGap = 6;
+
+  const styles = createStyles(colors, isDesktop, mobileGap);
+
+  // ------------------------------------------------------------
+  // SORT SEATS
+  // ------------------------------------------------------------
 
   const sortedSeats = [...seats].sort((a, b) => a.seatNumber - b.seatNumber);
 
-  // ============================================================
+  // ------------------------------------------------------------
   // CREATE ROWS
-  // ============================================================
+  // ------------------------------------------------------------
 
   const rows = [];
 
-  for (let i = 0; i < sortedSeats.length; i += 5) {
-    rows.push(sortedSeats.slice(i, i + 5));
+  for (let i = 0; i < sortedSeats.length; i += columns) {
+    rows.push(sortedSeats.slice(i, i + columns));
   }
 
-  // ============================================================
+  // ------------------------------------------------------------
   // RENDER SEAT
-  // ============================================================
+  // ------------------------------------------------------------
 
-  const renderSeat = (seat, index, rowIndex) => {
+  const renderSeat = (seat, index) => {
     const seatNumber = seat.seatNumber;
 
     const occupied = !!seat.occupied;
-
     const held = !!seat.held;
 
     const status = occupied ? "occupied" : held ? "held" : "vacant";
 
     const handlePress = () => {
       if (status === "occupied") {
-        if (onOccupiedPress) {
-          onOccupiedPress(seatNumber);
-        }
-
+        onOccupiedPress?.(seatNumber);
         return;
       }
 
       if (status === "held") {
-        if (onHeldPress) {
-          onHeldPress(seat);
-        }
-
+        onHeldPress?.(seat);
         return;
       }
 
-      if (onVacantPress) {
-        onVacantPress(seatNumber);
-      }
+      onVacantPress?.(seatNumber);
     };
+
+    // ----------------------------------------------------------
+    // COLORS
+    // ----------------------------------------------------------
 
     let backgroundColor;
     let borderColor;
@@ -117,6 +109,7 @@ export default function SeatGrid({
           },
         ]}
       >
+        {/* SEAT NUMBER */}
         <Text
           style={[
             styles.seatNumber,
@@ -128,6 +121,7 @@ export default function SeatGrid({
           {seatNumber}
         </Text>
 
+        {/* OCCUPIED */}
         {status === "occupied" && (
           <Text
             style={[
@@ -141,6 +135,7 @@ export default function SeatGrid({
           </Text>
         )}
 
+        {/* HELD */}
         {status === "held" && (
           <>
             <Text
@@ -157,6 +152,7 @@ export default function SeatGrid({
             {seat.holdName ? (
               <Text
                 numberOfLines={1}
+                ellipsizeMode="tail"
                 style={[
                   styles.holdName,
                   {
@@ -170,6 +166,7 @@ export default function SeatGrid({
           </>
         )}
 
+        {/* VACANT */}
         {status === "vacant" && (
           <Text
             style={[
@@ -186,18 +183,22 @@ export default function SeatGrid({
     );
   };
 
-  // ============================================================
-  // RENDER
-  // ============================================================
+  // ------------------------------------------------------------
+  // UI
+  // ------------------------------------------------------------
 
   return (
     <View style={styles.container}>
       {rows.map((row, rowIndex) => {
+        // Zig-zag arrangement
         const displayRow = rowIndex % 2 === 1 ? [...row].reverse() : row;
 
         return (
-          <View key={`row-${rowIndex}`} style={styles.row}>
-            {displayRow.map((seat, index) => renderSeat(seat, index, rowIndex))}
+          <View
+            key={`row-${rowIndex}`}
+            style={[styles.row, isDesktop && styles.desktopRow]}
+          >
+            {displayRow.map((seat, index) => renderSeat(seat, index))}
           </View>
         );
       })}
@@ -205,72 +206,111 @@ export default function SeatGrid({
   );
 }
 
-// ============================================================
+// ================================================================
 // STYLES
-// ============================================================
+// ================================================================
 
-const createStyles = (colors, isDesktop) =>
-  StyleSheet.create({
+function createStyles(colors, isDesktop, mobileGap) {
+  return StyleSheet.create({
+    // ------------------------------------------------------------
+    // CONTAINER
+    // ------------------------------------------------------------
+
     container: {
       width: "100%",
+      alignSelf: "stretch",
+      alignItems: isDesktop ? "stretch" : "center",
 
-      paddingVertical: isDesktop ? 4 : 8,
-
-      alignItems: "center",
+      paddingVertical: isDesktop ? 4 : 6,
+      paddingHorizontal: isDesktop ? 0 : 4,
     },
+
+    // ------------------------------------------------------------
+    // ROW
+    // ------------------------------------------------------------
 
     row: {
+      width: "100%",
       flexDirection: "row",
-      justifyContent: "center",
       alignItems: "center",
-
-      marginBottom: isDesktop ? 13 : 10,
-
-      gap: isDesktop ? 12 : 8,
+      marginBottom: isDesktop ? 13 : 8,
+      gap: isDesktop ? 12 : mobileGap,
     },
+
+    desktopRow: {
+      width: "100%",
+      alignSelf: "stretch",
+      marginBottom: 13,
+    },
+
+    // ------------------------------------------------------------
+    // SEAT
+    // ------------------------------------------------------------
 
     seat: {
-      width: isDesktop ? 78 : 58,
+      flex: 1,
+      minWidth: 0,
 
-      minHeight: isDesktop ? 78 : 62,
+      minHeight: isDesktop ? 78 : 50,
 
-      borderWidth: isDesktop ? 1.5 : 1.5,
+      // Desktop seats expand to fill the row.
+      // Mobile sizing stays unchanged.
+      maxWidth: isDesktop ? undefined : undefined,
 
-      borderRadius: isDesktop ? 14 : 12,
+      borderWidth: isDesktop ? 1.5 : 1,
+      borderRadius: isDesktop ? 14 : 9,
 
       justifyContent: "center",
       alignItems: "center",
 
-      paddingVertical: isDesktop ? 9 : 7,
-
-      paddingHorizontal: 4,
+      paddingVertical: isDesktop ? 9 : 5,
+      paddingHorizontal: 2,
     },
+
+    // ------------------------------------------------------------
+    // SEAT NUMBER
+    // ------------------------------------------------------------
 
     seatNumber: {
-      fontSize: isDesktop ? 21 : 17,
+      fontSize: isDesktop ? 21 : 14,
+
+      lineHeight: isDesktop ? 24 : 17,
 
       fontWeight: "800",
-
-      lineHeight: isDesktop ? 24 : 20,
     },
+
+    // ------------------------------------------------------------
+    // STATUS
+    // ------------------------------------------------------------
 
     statusText: {
       fontSize: isDesktop ? 8 : 7,
 
+      lineHeight: isDesktop ? 10 : 8,
+
       fontWeight: "800",
 
-      marginTop: 3,
+      marginTop: 2,
 
-      letterSpacing: 0.4,
+      letterSpacing: 0.3,
     },
 
+    // ------------------------------------------------------------
+    // HOLD NAME
+    // ------------------------------------------------------------
+
     holdName: {
-      maxWidth: isDesktop ? 65 : 48,
+      maxWidth: isDesktop ? 65 : "90%",
 
       fontSize: isDesktop ? 8 : 7,
+
+      lineHeight: isDesktop ? 10 : 8,
 
       fontWeight: "600",
 
       marginTop: 2,
+
+      textAlign: "center",
     },
   });
+}

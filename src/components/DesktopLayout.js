@@ -37,6 +37,7 @@ export default function DesktopLayout({
   title,
   subtitle,
   headerRight = null,
+  subscriptionLocked = false,
   children,
 }) {
   const navigation = useNavigation();
@@ -155,6 +156,7 @@ export default function DesktopLayout({
           activeRoute={activeRoute}
           colors={colors}
           onNavigate={navigate}
+          subscriptionLocked={subscriptionLocked}
         />
 
         {/* ====================================================
@@ -233,7 +235,7 @@ export default function DesktopLayout({
 // DESKTOP SIDEBAR
 // ============================================================
 
-function DesktopSidebar({ activeRoute, colors, onNavigate }) {
+function DesktopSidebar({ activeRoute, colors, onNavigate, subscriptionLocked }) {
   return (
     <View
       style={[
@@ -254,37 +256,41 @@ function DesktopSidebar({ activeRoute, colors, onNavigate }) {
         ==================================================== */}
 
         <View style={styles.navigation}>
-          <SidebarItem
-            icon="house"
-            label="Dashboard"
-            active={activeRoute === "Dashboard"}
-            colors={colors}
-            onPress={() => onNavigate("Home")}
-          />
+          {!subscriptionLocked && (
+            <>
+              <SidebarItem
+                icon="house"
+                label="Dashboard"
+                active={activeRoute === "Dashboard"}
+                colors={colors}
+                onPress={() => onNavigate("Home")}
+              />
 
-          <SidebarItem
-            icon="users"
-            label="Students"
-            active={activeRoute === "Students"}
-            colors={colors}
-            onPress={() => onNavigate("Students")}
-          />
+              <SidebarItem
+                icon="users"
+                label="Students"
+                active={activeRoute === "Students"}
+                colors={colors}
+                onPress={() => onNavigate("Students")}
+              />
 
-          <SidebarItem
-            icon="file-invoice-dollar"
-            label="Billing"
-            active={activeRoute === "Billing"}
-            colors={colors}
-            onPress={() => onNavigate("Billing")}
-          />
+              <SidebarItem
+                icon="file-invoice-dollar"
+                label="Billing"
+                active={activeRoute === "Billing"}
+                colors={colors}
+                onPress={() => onNavigate("Billing")}
+              />
 
-          <SidebarItem
-            icon="clock"
-            label="Half Day Students"
-            active={activeRoute === "HalfDayStudents"}
-            colors={colors}
-            onPress={() => onNavigate("HalfDayStudents")}
-          />
+              <SidebarItem
+                icon="clock"
+                label="Half Day Students"
+                active={activeRoute === "HalfDayStudents"}
+                colors={colors}
+                onPress={() => onNavigate("HalfDayStudents")}
+              />
+            </>
+          )}
 
           <SidebarItem
             icon="user"

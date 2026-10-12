@@ -6,6 +6,7 @@ import {
   Alert,
   TouchableOpacity,
   ScrollView,
+  Linking,
 } from "react-native";
 
 import AppInput from "../components/AppInput";
@@ -205,9 +206,20 @@ export default function LoginScreen({ navigation }) {
 
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => navigation.navigate("Signup")}
+              onPress={async () => {
+                const url = "https://libmanagee.vercel.app";
+
+                try {
+                  await Linking.openURL(url);
+                } catch (error) {
+                  Alert.alert(
+                    "Unable to open website",
+                    "Please try again or open the website in your browser."
+                  );
+                }
+              }}
             >
-              <Text style={styles.signupLink}>Sign Up</Text>
+              <Text style={styles.signupLink}>Enquiry Now </Text>
             </TouchableOpacity>
           </View>
         )}

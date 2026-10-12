@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 import {
   View,
@@ -7,7 +7,7 @@ import {
   ScrollView,
   RefreshControl,
   TouchableOpacity,
-  useWindowDimensions,
+  Platform,
 } from "react-native";
 
 import { FontAwesome6 } from "@expo/vector-icons";
@@ -20,6 +20,16 @@ import AlertItem from "./AlertItem";
 import { lightColors, darkColors, radius, spacing } from "../theme/colors";
 import { useTheme } from "../context/ThemeContext";
 
+function getAlertKey(item) {
+  if (item.alertType === "SEAT_HOLD_ACTIVE") {
+    return `active-hold-${item.holdId ?? item.id}`;
+  }
+  if (item.alertType === "SEAT_HOLD_EXPIRED") {
+    return `expired-hold-${item.holdId ?? item.id}`;
+  }
+  return `student-${item.id ?? `${item.seatNumber}-${item.phone}`}`;
+}
+
 export default function DesktopDashboard({
   navigation,
 
@@ -28,8 +38,6 @@ export default function DesktopDashboard({
 
   combinedAlerts,
   visibleAlerts,
-  showAllAlerts,
-  setShowAllAlerts,
 
   refreshing,
   onRefresh,
@@ -43,17 +51,25 @@ export default function DesktopDashboard({
   onAlertStudentPress,
 
   onActiveHoldPress,
+  onRemoveExpiredHold,
 }) {
   const { isDarkMode } = useTheme();
 
   const colors = isDarkMode ? darkColors : lightColors;
-  const { height } = useWindowDimensions();
+  const [seatPanelHeight, setSeatPanelHeight] = useState(0);
+  const [alertOffsets, setAlertOffsets] = useState({});
 
   const styles = createStyles(colors);
   const desktopScrollbarStyle = {
     scrollbarWidth: "none",
     msOverflowStyle: "none",
   };
+  const alertSnapOffsets = [
+    0,
+    ...visibleAlerts
+      .map((item) => alertOffsets[getAlertKey(item)])
+      .filter(Number.isFinite),
+  ].sort((a, b) => a - b);
 
   return (
     <DesktopLayout
@@ -158,6 +174,14 @@ export default function DesktopDashboard({
                   borderColor: colors.border,
                 },
               ]}
+              onLayout={(event) => {
+                const measuredHeight = event.nativeEvent.layout.height;
+                setSeatPanelHeight((current) =>
+                  Math.abs(current - measuredHeight) > 1
+                    ? measuredHeight
+                    : current
+                );
+              }}
             >
               <View style={styles.panelHeader}>
                 <View>
@@ -258,6 +282,7 @@ export default function DesktopDashboard({
                 {
                   backgroundColor: colors.card,
                   borderColor: colors.border,
+                  height: seatPanelHeight || undefined,
                 },
               ]}
             >
@@ -322,31 +347,52 @@ export default function DesktopDashboard({
                     {
                       scrollbarWidth: "none",
                       msOverflowStyle: "none",
+                      scrollSnapType: Platform.OS === "web" ? "y mandatory" : undefined,
+                      scrollSnapStop: Platform.OS === "web" ? "always" : undefined,
                     },
                   ]}
+                  snapToOffsets={Platform.OS === "web" ? undefined : alertSnapOffsets}
+                  snapToStart
+                  snapToEnd
+                  disableIntervalMomentum
+                  decelerationRate="fast"
                   contentContainerStyle={styles.alertListContent}
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled={true}
                 >
                   {visibleAlerts.map((item) => {
-                    const key =
-                      item.alertType === "SEAT_HOLD_ACTIVE"
-                        ? `active-hold-${item.id}`
-                        : item.alertType === "SEAT_HOLD_EXPIRED"
-                        ? `expired-hold-${item.id}`
-                        : `student-${
-                            item.id ?? `${item.seatNumber}-${item.phone}`
-                          }`;
+                    const key = getAlertKey(item);
 
                     return (
-                      <View key={key} style={styles.alertItemWrapper}>
+                      <View
+                        key={key}
+                        onLayout={(event) => {
+                          const y = event.nativeEvent.layout.y;
+                          setAlertOffsets((current) =>
+                            Math.abs((current[key] ?? -1) - y) > 1
+                              ? { ...current, [key]: y }
+                              : current
+                          );
+                        }}
+                        style={[
+                          styles.alertItemWrapper,
+                          Platform.OS === "web" && {
+                            scrollSnapAlign: "start",
+                            scrollSnapStop: "always",
+                          },
+                        ]}
+                      >
                         {item.alertType === "SEAT_HOLD_ACTIVE" ? (
                           <SeatHoldAlertItem
                             alert={item}
                             onPress={() => onActiveHoldPress(item)}
                           />
                         ) : item.alertType === "SEAT_HOLD_EXPIRED" ? (
-                          <SeatHoldAlertItem alert={item} onPress={() => {}} />
+                          <SeatHoldAlertItem
+                            alert={item}
+                            onPress={() => {}}
+                            onRemove={() => onRemoveExpiredHold(item)}
+                          />
                         ) : (
                           <AlertItem
                             student={item}
@@ -359,34 +405,6 @@ export default function DesktopDashboard({
                 </ScrollView>
               )}
 
-              {/* VIEW ALL */}
-
-              {combinedAlerts.length > 3 && (
-                <TouchableOpacity
-                  style={styles.viewAllButton}
-                  activeOpacity={0.75}
-                  onPress={() => setShowAllAlerts(!showAllAlerts)}
-                >
-                  <Text
-                    style={[
-                      styles.viewAllText,
-                      {
-                        color: colors.primaryBlue,
-                      },
-                    ]}
-                  >
-                    {showAllAlerts
-                      ? "Show Less"
-                      : `View All Alerts (${combinedAlerts.length})`}
-                  </Text>
-
-                  <FontAwesome6
-                    name={showAllAlerts ? "chevron-up" : "chevron-down"}
-                    size={11}
-                    color={colors.primaryBlue}
-                  />
-                </TouchableOpacity>
-              )}
             </View>
           </View>
 
@@ -734,6 +752,7 @@ function createStyles(colors, height) {
       width: 390,
       flexShrink: 0,
       minHeight: 0,
+      flexDirection: "column",
       overflow: "hidden",
     },
 
@@ -820,7 +839,7 @@ function createStyles(colors, height) {
 
     alertList: {
       width: "100%",
-      height: 520,
+      flex: 1,
       minHeight: 0,
       overflowY: "auto",
       overflowX: "hidden",

@@ -1,23 +1,21 @@
 {
   "expo": {
-    "name": "SeatManager",
-    "slug": "seatmanager-app",
+    "name": "LibManage",
+    "slug": "LibManage",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
+    "assetBundlePatterns": ["**/*"],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.seatmanager.app",
+      "bundleIdentifier": "com.libmanage.app",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "com.seatmanager.app",
+      "package": "com.libmanage.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#f6f8fc"

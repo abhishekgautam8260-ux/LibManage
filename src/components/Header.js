@@ -15,12 +15,18 @@ import {
 import { FontAwesome6 } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
 
+import {
+  lightColors,
+  darkColors,
+  radius,
+  spacing,
+  mobileSizes,
+} from "../theme/colors";
+
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 
 import { checkLibraryExists } from "../api/library";
-
-import { lightColors, darkColors } from "../theme/colors";
 
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -73,18 +79,12 @@ export default function Header() {
     await signOut();
   };
 
-  const handleLanguage = () => {
-    setMenuOpen(false);
-
-    // Language screen can be added later.
-  };
-
   return (
     <View
       style={[
         styles.header,
         {
-          paddingTop: insets.top + 8,
+          paddingTop: insets.top + 4,
           backgroundColor: theme.card,
           borderBottomColor: theme.border,
         },
@@ -104,7 +104,7 @@ export default function Header() {
             },
           ]}
         >
-          <FontAwesome6 name="book-open" size={18} color="#fff" />
+          <FontAwesome6 name="book-open" size={16} color="#fff" />
         </View>
 
         <View style={styles.brandContainer}>
@@ -189,7 +189,7 @@ export default function Header() {
           ]}
           activeOpacity={0.8}
         >
-          <FontAwesome6 name="gear" size={21} color={theme.primaryBlue} />
+          <FontAwesome6 name="gear" size={18} color={theme.primaryBlue} />
         </TouchableOpacity>
       </View>
 
@@ -263,45 +263,6 @@ export default function Header() {
                 },
               ]}
             />
-
-            {/* LANGUAGE */}
-            <TouchableOpacity
-              style={styles.menuItem}
-              onPress={handleLanguage}
-              activeOpacity={0.7}
-            >
-              <View
-                style={[
-                  styles.menuIconContainer,
-                  {
-                    backgroundColor: theme.bg,
-                  },
-                ]}
-              >
-                <FontAwesome6
-                  name="globe"
-                  size={18}
-                  color={theme.textSecondary}
-                />
-              </View>
-
-              <Text
-                style={[
-                  styles.menuText,
-                  {
-                    color: theme.textPrimary,
-                  },
-                ]}
-              >
-                Language
-              </Text>
-
-              <FontAwesome6
-                name="chevron-right"
-                size={13}
-                color={theme.textMuted}
-              />
-            </TouchableOpacity>
 
             {/* DARK MODE */}
             <View style={styles.menuItem}>
@@ -392,8 +353,8 @@ export default function Header() {
 
 const styles = StyleSheet.create({
   header: {
-    paddingHorizontal: 16,
-    paddingBottom: 8,
+    paddingHorizontal: 12,
+    paddingBottom: 6,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -415,54 +376,79 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
+  logoContainer: {
+    width: 36,
+    height: 36,
+
+    borderRadius: 10,
+
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
   brandContainer: {
-    marginLeft: 10,
+    marginLeft: 8,
+
     flex: 1,
+
     minWidth: 0,
   },
 
   appName: {
-    fontSize: 18,
-    lineHeight: 21,
+    fontSize: 16,
+
+    lineHeight: 19,
+
     fontWeight: "800",
   },
 
   libraryName: {
-    fontSize: 12,
-    lineHeight: 16,
-    marginTop: 1,
+    fontSize: 10,
+
+    lineHeight: 13,
+
+    marginTop: 0,
+
     fontWeight: "500",
   },
 
   rightSection: {
     flexDirection: "row",
+
     alignItems: "center",
-    gap: 8,
-    marginLeft: 10,
+
+    gap: 6,
+
+    marginLeft: 8,
   },
 
   profileBtn: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: 38,
+    height: 38,
+
+    borderRadius: 19,
+
     alignItems: "center",
     justifyContent: "center",
   },
 
   profileInitial: {
     color: "#fff",
-    fontSize: 18,
+
+    fontSize: 16,
+
     fontWeight: "800",
   },
 
   settingsBtn: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 40,
+    height: 40,
+
+    borderRadius: 20,
+
     alignItems: "center",
     justifyContent: "center",
   },
-
   menuOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",

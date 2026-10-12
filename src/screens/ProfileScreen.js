@@ -24,6 +24,7 @@ import Header from "../components/Header";
 import DesktopLayout from "../components/DesktopLayout";
 
 import { useAuth } from "../context/AuthContext";
+import { useSubscription } from "../context/SubscriptionContext";
 
 import {
   getProfile,
@@ -68,6 +69,7 @@ export default function ProfileScreen() {
   const { colors, styles } = useScreenTheme();
 
   const { libraryId, signOut, isAdmin, canManageEmployees } = useAuth();
+  const subscriptionState = useSubscription();
 
   const { width } = useWindowDimensions();
 
@@ -113,13 +115,24 @@ export default function ProfileScreen() {
   const [employeeModalMode, setEmployeeModalMode] = useState("list");
 
   const [editingEmployee, setEditingEmployee] = useState(null);
+  const [subscriptionGateDismissed, setSubscriptionGateDismissed] = useState(false);
+
+  useEffect(() => {
+    if (subscriptionState.isLocked) {
+      setSubscriptionGateDismissed(false);
+      setAdminEditVisible(false);
+      setLibraryEditVisible(false);
+      setEmployeeModalVisible(false);
+      setEditingEmployee(null);
+    }
+  }, [subscriptionState.isLocked]);
 
   // =========================================================
   // LOAD PROFILE
   // =========================================================
 
   const loadProfile = useCallback(async () => {
-    if (!libraryId) return;
+    if (!libraryId || subscriptionState.isLocked) return;
 
     try {
       const data = await getProfile(libraryId);
@@ -133,14 +146,14 @@ export default function ProfileScreen() {
         error?.message || "Something went wrong while loading your profile."
       );
     }
-  }, [libraryId]);
+  }, [libraryId, subscriptionState.isLocked]);
 
   // =========================================================
   // LOAD EMPLOYEES
   // =========================================================
 
   const loadEmployees = useCallback(async () => {
-    if (!libraryId || !canManageEmployees) return;
+    if (!libraryId || !canManageEmployees || subscriptionState.isLocked) return;
 
     try {
       setEmployeesLoading(true);
@@ -158,7 +171,7 @@ export default function ProfileScreen() {
     } finally {
       setEmployeesLoading(false);
     }
-  }, [libraryId, canManageEmployees]);
+  }, [libraryId, canManageEmployees, subscriptionState.isLocked]);
 
   // =========================================================
   // INITIAL LOAD
@@ -166,7 +179,7 @@ export default function ProfileScreen() {
 
   useEffect(() => {
     const loadData = async () => {
-      if (!libraryId) {
+      if (!libraryId || subscriptionState.isLocked) {
         setLoading(false);
         return;
       }
@@ -185,13 +198,14 @@ export default function ProfileScreen() {
     };
 
     loadData();
-  }, [libraryId, loadProfile, loadEmployees, canManageEmployees]);
+  }, [libraryId, loadProfile, loadEmployees, canManageEmployees, subscriptionState.isLocked]);
 
   // =========================================================
   // REFRESH
   // =========================================================
 
   const handleRefresh = async () => {
+    if (subscriptionState.isLocked) return;
     setRefreshing(true);
 
     try {
@@ -610,8 +624,9 @@ export default function ProfileScreen() {
         activeRoute="Profile"
         title="Profile"
         subtitle="Manage your account and library settings"
+        subscriptionLocked={subscriptionState.isLocked}
         headerRight={
-          isAdmin && canManageEmployees ? (
+          isAdmin && canManageEmployees && !subscriptionState.isLocked ? (
             <TouchableOpacity
               style={styles.desktopHeaderButton}
               onPress={openEmployeeManagement}
@@ -650,8 +665,17 @@ export default function ProfileScreen() {
             onToggleEmployeeStatus={handleToggleStatus}
             onDeleteEmployee={handleDeleteEmployee}
             onRefreshEmployees={loadEmployees}
+            subscription={subscriptionState.subscription}
+            subscriptionStatus={subscriptionState}
+            isSubscriptionLocked={subscriptionState.isLocked}
+            onRenewSubscription={subscriptionState.renewSubscription}
           />
         </ScrollView>
+        <SubscriptionAccessModal
+          visible={subscriptionState.isLocked && !subscriptionGateDismissed}
+          colors={colors}
+          onReview={() => setSubscriptionGateDismissed(true)}
+        />
       </DesktopLayout>
     );
   }
@@ -677,8 +701,87 @@ export default function ProfileScreen() {
         onToggleEmployeeStatus={handleToggleStatus}
         onDeleteEmployee={handleDeleteEmployee}
         onRefreshEmployees={loadEmployees}
+        subscription={subscriptionState.subscription}
+        subscriptionStatus={subscriptionState}
+        isSubscriptionLocked={subscriptionState.isLocked}
+        onRenewSubscription={subscriptionState.renewSubscription}
+      />
+      <SubscriptionAccessModal
+        visible={subscriptionState.isLocked && !subscriptionGateDismissed}
+        colors={colors}
+        onReview={() => setSubscriptionGateDismissed(true)}
       />
     </View>
+  );
+}
+
+function SubscriptionAccessModal({ visible, colors, onReview }) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={() => {}}>
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: "rgba(0,0,0,0.58)",
+          alignItems: "center",
+          justifyContent: "center",
+          padding: 22,
+        }}
+      >
+        <View
+          style={{
+            width: "100%",
+            maxWidth: 440,
+            backgroundColor: colors.card,
+            borderRadius: 20,
+            padding: 24,
+            borderWidth: 1,
+            borderColor: colors.border,
+            alignItems: "center",
+          }}
+        >
+          <FontAwesome6 name="lock" size={25} color={colors.danger} />
+          <Text
+            style={{
+              color: colors.textPrimary,
+              fontSize: 21,
+              fontWeight: "800",
+              textAlign: "center",
+              marginTop: 15,
+            }}
+          >
+            Subscription required
+          </Text>
+          <Text
+            style={{
+              color: colors.textSecondary,
+              fontSize: 14,
+              lineHeight: 21,
+              textAlign: "center",
+              marginTop: 8,
+            }}
+          >
+            Account features are paused. Review the available plans to restore access.
+          </Text>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={onReview}
+            style={{
+              alignSelf: "stretch",
+              height: 48,
+              backgroundColor: colors.primaryBlue,
+              borderRadius: 11,
+              alignItems: "center",
+              justifyContent: "center",
+              marginTop: 20,
+            }}
+          >
+            <Text style={{ color: "#fff", fontWeight: "800", fontSize: 14 }}>
+              Review subscription
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
   );
 }
 // =========================================================

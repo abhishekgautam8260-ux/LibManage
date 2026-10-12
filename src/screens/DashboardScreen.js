@@ -13,6 +13,7 @@ import {
   TextInput,
   useWindowDimensions,
   Platform,
+  Linking,
 } from "react-native";
 import SeatActionModal from "../components/SeatActionModal";
 
@@ -170,7 +171,7 @@ export default function DashboardScreen() {
 
   const styles = useMemo(() => createStyles(colors), [colors]);
 
-  const { libraryId, canEditStudent, canManageSeats } = useAuth();
+  const { libraryId, libraryName, canEditStudent, canManageSeats } = useAuth();
 
   const isDesktop = Platform.OS === "web" && width >= 1024;
   useEffect(() => {
@@ -258,7 +259,7 @@ export default function DashboardScreen() {
 
   const [activeSeatHolds, setActiveSeatHolds] = useState([]);
 
-  const [showAllAlerts, setShowAllAlerts] = useState(false);
+  const [alertWidth, setAlertWidth] = useState(0);
 
   const [loading, setLoading] = useState(true);
 
@@ -277,6 +278,7 @@ export default function DashboardScreen() {
   const [selectedHeldSeat, setSelectedHeldSeat] = useState(null);
 
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [receiptPrompt, setReceiptPrompt] = useState(null);
 
   // ==========================================================
   // STUDENT DETAIL
@@ -492,6 +494,7 @@ export default function DashboardScreen() {
      */
     try {
       await loadAll();
+
       if (libraryId) {
         const updatedSeats = await getSeats(libraryId);
 
@@ -525,6 +528,26 @@ export default function DashboardScreen() {
       }
     } catch (error) {
       console.error("❌ Failed to refresh after cancelling hold:", error);
+    }
+  };
+
+  const handleRemoveExpiredSeatHold = async (alert) => {
+    const holdId = alert?.holdId ?? alert?.id;
+    if (holdId === undefined || holdId === null) {
+      Alert.alert("Unable to remove hold", "The hold record ID is missing.");
+      return;
+    }
+
+    try {
+      await cancelSeatHold(holdId);
+      await loadAll();
+    } catch (error) {
+      Alert.alert(
+        "Unable to remove hold",
+        error?.response?.data?.message ||
+          error?.message ||
+          "Please try again."
+      );
     }
   };
 
@@ -699,7 +722,7 @@ export default function DashboardScreen() {
         holdId: selectedHeldSeat?.holdId || null,
       });
 
-      await bookSeat({
+      const bookingResponse = await bookSeat({
         libraryId,
         seatNumber,
         name,
@@ -709,9 +732,69 @@ export default function DashboardScreen() {
         holdId: selectedHeldSeat?.holdId || null,
       });
 
+      let bookedStudent = bookingResponse?.student || bookingResponse || {};
+      try {
+        bookedStudent = {
+          ...bookedStudent,
+          ...(await getStudentBySeat(seatNumber, libraryId)),
+        };
+      } catch (dateLookupError) {
+        // The booking succeeded; keep the receipt prompt available if the
+        // follow-up lookup cannot return the saved subscription dates.
+        console.warn("Could not load saved subscription dates for receipt.", dateLookupError);
+      }
+
       setBookingModalVisible(false);
       setBookingSeat(null);
       setSelectedHeldSeat(null);
+
+      const normalizedPhone = String(phone || "").replace(/\D/g, "");
+      const whatsappPhone =
+        normalizedPhone.length === 10 ? `91${normalizedPhone}` : normalizedPhone;
+
+      const formatReceiptDate = (value) => {
+        if (!value) return "Not available";
+        const raw = String(value);
+        const isoDate = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+        if (isoDate) return `${isoDate[3]}/${isoDate[2]}/${isoDate[1]}`;
+        const parsed = new Date(value);
+        if (Number.isNaN(parsed.getTime())) return raw;
+        return parsed.toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric",
+        });
+      };
+      const joinedOn =
+        bookedStudent.bookingDate ||
+        bookedStudent.joinDate ||
+        bookedStudent.joiningDate ||
+        bookedStudent.startDate ||
+        (() => {
+          const today = new Date();
+          return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+        })();
+      const expiresOn =
+        bookedStudent.expireDate || bookedStudent.expiryDate || bookedStudent.endDate;
+
+      const receiptMessage =
+        `Hello ${name} 👋\n\n` +
+        `Your seat booking is confirmed.\n\n` +
+        `Library: ${libraryName || "Library"}\n` +
+        `Seat No: ${seatNumber}\n` +
+        `Date of joining: ${formatReceiptDate(joinedOn)}\n` +
+        `Subscription expires: ${formatReceiptDate(expiresOn)}\n` +
+        `Amount received: ₹${amountPaid}\n\n` +
+        `Thank you 🙏`;
+
+      // Show our own modal so the prompt and its buttons work consistently
+      // on native platforms and Expo Web (Alert.alert buttons are platform-dependent).
+      setReceiptPrompt({
+        seatNumber,
+        phone: whatsappPhone,
+        message: receiptMessage,
+        hasPhone: !!normalizedPhone,
+      });
 
       await loadAll();
     } catch (err) {
@@ -1003,9 +1086,26 @@ export default function DashboardScreen() {
 
   const combinedAlerts = [...activeSeatHolds, ...alerts];
 
-  const visibleAlerts = showAllAlerts
-    ? combinedAlerts
-    : combinedAlerts.slice(0, 3);
+  const visibleAlerts = combinedAlerts;
+  const expiredSeatHoldAlerts = alerts.filter(
+    (item) => item.alertType === "SEAT_HOLD_EXPIRED"
+  );
+  const gridSeats = seats.map((seat) => {
+    if (seat.occupied || seat.held) return seat;
+    const expiredHold = expiredSeatHoldAlerts.find(
+      (item) => Number(item.seatNumber) === Number(seat.seatNumber)
+    );
+    return expiredHold
+      ? {
+          ...seat,
+          held: true,
+          holdId: expiredHold.holdId ?? expiredHold.id,
+          holdName: expiredHold.name,
+          holdPhone: expiredHold.phone,
+          holdUntil: expiredHold.holdUntil,
+        }
+      : seat;
+  });
 
   // ============================================================
   // UI
@@ -1023,11 +1123,9 @@ export default function DashboardScreen() {
           <DesktopDashboard
             navigation={navigation}
             stats={stats}
-            seats={seats}
+            seats={gridSeats}
             combinedAlerts={combinedAlerts}
             visibleAlerts={visibleAlerts}
-            showAllAlerts={showAllAlerts}
-            setShowAllAlerts={setShowAllAlerts}
             refreshing={refreshing}
             onRefresh={onRefresh}
             canManageSeats={canManageSeats}
@@ -1045,15 +1143,21 @@ export default function DashboardScreen() {
                 setHeldSeatModalVisible(true);
               }
             }}
+            onRemoveExpiredHold={handleRemoveExpiredSeatHold}
           />
         </>
       ) : (
         <>
           <Header />
           <ScrollView
+            style={{
+              flex: 1,
+              backgroundColor: colors.bg,
+            }}
             contentContainerStyle={{
-              padding: spacing.md,
-              paddingBottom: 40,
+              paddingHorizontal: spacing.md,
+              paddingTop: spacing.md,
+              paddingBottom: 110,
             }}
             refreshControl={
               <RefreshControl
@@ -1155,24 +1259,40 @@ export default function DashboardScreen() {
               {visibleAlerts.length === 0 ? (
                 <Text style={styles.emptyText}>No pending alerts</Text>
               ) : (
-                <View style={styles.alertSliderWrapper}>
+                <View
+                  style={styles.alertSliderWrapper}
+                  onLayout={(event) => {
+                    const measuredWidth = event.nativeEvent.layout.width;
+
+                    if (measuredWidth !== alertWidth) {
+                      setAlertWidth(measuredWidth);
+                    }
+                  }}
+                >
                   <ScrollView
                     horizontal
                     pagingEnabled={false}
+                    style={{
+                      scrollSnapType:
+                        Platform.OS === "web" ? "x mandatory" : undefined,
+                      scrollSnapStop:
+                        Platform.OS === "web" ? "always" : undefined,
+                    }}
                     showsHorizontalScrollIndicator={false}
                     nestedScrollEnabled
                     decelerationRate="fast"
-                    snapToInterval={width * 0.82 + 12}
+                    snapToInterval={alertWidth + 12}
                     snapToAlignment="start"
+                    disableIntervalMomentum
                     contentContainerStyle={styles.alertSliderContent}
                   >
-                    {visibleAlerts.map((item, index) => (
+                    {visibleAlerts.map((item) => (
                       <View
                         key={
                           item.alertType === "SEAT_HOLD_ACTIVE"
-                            ? `active-hold-${item.id}`
+                            ? `active-hold-${item.holdId ?? item.id}`
                             : item.alertType === "SEAT_HOLD_EXPIRED"
-                            ? `expired-hold-${item.id}`
+                            ? `expired-hold-${item.holdId ?? item.id}`
                             : `student-${
                                 item.id ?? `${item.seatNumber}-${item.phone}`
                               }`
@@ -1180,7 +1300,13 @@ export default function DashboardScreen() {
                         style={[
                           styles.alertSlide,
                           {
-                            width: width * 0.82,
+                            width: alertWidth || "100%",
+                            ...(Platform.OS === "web"
+                              ? {
+                                  scrollSnapAlign: "start",
+                                  scrollSnapStop: "always",
+                                }
+                              : {}),
                           },
                         ]}
                       >
@@ -1199,7 +1325,11 @@ export default function DashboardScreen() {
                             }}
                           />
                         ) : item.alertType === "SEAT_HOLD_EXPIRED" ? (
-                          <SeatHoldAlertItem alert={item} onPress={() => {}} />
+                          <SeatHoldAlertItem
+                            alert={item}
+                            onPress={() => {}}
+                            onRemove={() => handleRemoveExpiredSeatHold(item)}
+                          />
                         ) : (
                           <AlertItem
                             student={item}
@@ -1212,15 +1342,6 @@ export default function DashboardScreen() {
                 </View>
               )}
 
-              {alerts.length > 3 && (
-                <TouchableOpacity
-                  onPress={() => setShowAllAlerts(!showAllAlerts)}
-                >
-                  <Text style={styles.viewAll}>
-                    {showAllAlerts ? "Show Less" : "View All Alerts"}
-                  </Text>
-                </TouchableOpacity>
-              )}
             </View>
 
             {/* ====================================================
@@ -1270,7 +1391,7 @@ export default function DashboardScreen() {
               </View>
 
               <SeatGrid
-                seats={seats}
+                seats={gridSeats}
                 onVacantPress={handleVacantPress}
                 onOccupiedPress={handleOccupiedPress}
                 onHeldPress={handleHeldPress}
@@ -1295,6 +1416,81 @@ export default function DashboardScreen() {
         onConfirm={confirmBooking}
         loading={bookingLoading}
       />
+      <Modal
+        visible={!!receiptPrompt}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReceiptPrompt(null)}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "rgba(0,0,0,0.48)",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: spacing.md,
+          }}
+        >
+          <View
+            style={{
+              width: "100%",
+              maxWidth: 420,
+              backgroundColor: colors.card,
+              borderRadius: radius.lg,
+              padding: spacing.lg,
+              borderWidth: 1,
+              borderColor: colors.border,
+            }}
+          >
+            <Text style={{ color: colors.textPrimary, fontSize: 20, fontWeight: "700" }}>
+              Booking successful
+            </Text>
+            <Text style={{ color: colors.textSecondary, marginTop: 8, lineHeight: 21 }}>
+              {receiptPrompt?.hasPhone
+                ? `Seat ${receiptPrompt.seatNumber} is booked. Send the receipt to the student on WhatsApp?`
+                : `Seat ${receiptPrompt?.seatNumber} is booked, but no valid phone number was provided.`}
+            </Text>
+            <View style={{ flexDirection: "row", gap: spacing.sm, marginTop: spacing.lg }}>
+              <TouchableOpacity
+                onPress={() => setReceiptPrompt(null)}
+                style={{
+                  flex: 1,
+                  minHeight: 46,
+                  borderRadius: radius.sm,
+                  borderWidth: 1,
+                  borderColor: colors.border,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: colors.bg,
+                }}
+              >
+                <Text style={{ color: colors.textSecondary, fontWeight: "600" }}>Not now</Text>
+              </TouchableOpacity>
+              {receiptPrompt?.hasPhone && (
+                <TouchableOpacity
+                  onPress={() => {
+                    const url = `https://wa.me/${receiptPrompt.phone}?text=${encodeURIComponent(receiptPrompt.message)}`;
+                    setReceiptPrompt(null);
+                    Linking.openURL(url).catch(() =>
+                      Alert.alert("Could not open WhatsApp", "Please try again or open WhatsApp manually.")
+                    );
+                  }}
+                  style={{
+                    flex: 1,
+                    minHeight: 46,
+                    borderRadius: radius.sm,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: colors.primaryBlue,
+                  }}
+                >
+                  <Text style={{ color: "#fff", fontWeight: "700" }}>Open WhatsApp</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
       <SeatHoldModal
         visible={seatHoldModalVisible}
         seatNumber={selectedHeldSeat?.seatNumber || bookingSeat}
@@ -1715,14 +1911,20 @@ export default function DashboardScreen() {
 function StatCard({ title, value, sub, icon, bg, color, styles }) {
   return (
     <View style={styles.statCard}>
-      <View>
-        <Text style={styles.statTitle}>{title}</Text>
+      {/* TEXT CONTENT */}
+      <View style={styles.statCardContent}>
+        <Text style={styles.statTitle} numberOfLines={2} ellipsizeMode="tail">
+          {title}
+        </Text>
 
         <Text style={styles.statValue}>{value}</Text>
 
-        <Text style={styles.statSub}>{sub}</Text>
+        <Text style={styles.statSub} numberOfLines={1} ellipsizeMode="tail">
+          {sub}
+        </Text>
       </View>
 
+      {/* ICON */}
       <View
         style={[
           styles.statIcon,
@@ -1869,61 +2071,116 @@ function createStyles(colors) {
       flexDirection: "row",
       flexWrap: "wrap",
       justifyContent: "space-between",
-      rowGap: 14,
-      marginBottom: spacing.md,
+      rowGap: 10,
+      marginBottom: 12,
     },
 
     statCardWrapper: {
       width: "48%",
     },
 
+    // ========================================================
+    // STAT GRID
+    // ========================================================
+
+    statGrid: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      justifyContent: "space-between",
+
+      rowGap: 10,
+
+      marginBottom: 12,
+    },
+    statCardContent: {
+      flex: 1,
+      minWidth: 0,
+      width: "100%",
+    },
+
+    statCardWrapper: {
+      width: "48.5%",
+    },
+
     statCard: {
       width: "100%",
-      borderRadius: 24,
-      padding: 20,
+      minHeight: 100,
+
+      borderRadius: 16,
+      padding: 14,
+      paddingRight: 62,
+
       position: "relative",
+
       backgroundColor: colors.card,
-      flexDirection: "row",
-      justifyContent: "space-between",
-      alignItems: "flex-start",
-      minHeight: 110,
+
+      justifyContent: "flex-start",
 
       shadowColor: "#000",
-      shadowOpacity: 0.06,
-      shadowRadius: 12,
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
 
       shadowOffset: {
         width: 0,
-        height: 4,
+        height: 3,
       },
 
       elevation: 2,
+
+      // IMPORTANT
+      overflow: "hidden",
     },
 
     statTitle: {
       fontSize: 12,
+      lineHeight: 16,
+
       color: colors.textSecondary,
+
       marginBottom: 4,
+
+      fontWeight: "500",
+
+      flexShrink: 1,
     },
 
     statValue: {
-      fontSize: 24,
+      fontSize: 22,
+      lineHeight: 26,
+
       fontWeight: "700",
+
       color: colors.textPrimary,
-      marginBottom: 4,
+
+      marginBottom: 3,
     },
 
     statSub: {
-      fontSize: 11,
+      fontSize: 10,
+      lineHeight: 13,
+
       color: colors.textFaint,
+
+      flexShrink: 1,
     },
 
     statIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
+      position: "absolute",
+
+      right: 12,
+      top: 14,
+
+      width: 38,
+      height: 38,
+
+      borderRadius: 11,
+
       alignItems: "center",
       justifyContent: "center",
+
+      zIndex: 2,
+
+      elevation: 2,
     },
 
     // ========================================================
@@ -1932,16 +2189,18 @@ function createStyles(colors) {
 
     card: {
       backgroundColor: colors.card,
-      borderRadius: radius.lg,
-      padding: spacing.md,
+
+      borderRadius: 16,
+
+      padding: 12,
 
       shadowColor: "#000",
       shadowOpacity: 0.04,
-      shadowRadius: 12,
+      shadowRadius: 8,
 
       shadowOffset: {
         width: 0,
-        height: 4,
+        height: 3,
       },
 
       elevation: 2,
@@ -1954,10 +2213,11 @@ function createStyles(colors) {
     },
 
     cardSubtitle: {
-      fontSize: 12,
+      fontSize: 10,
+      lineHeight: 13,
       color: colors.textMuted,
-      marginTop: 2,
-      marginBottom: spacing.sm,
+      marginTop: 1,
+      marginBottom: 8,
     },
 
     emptyText: {
@@ -2078,26 +2338,26 @@ function createStyles(colors) {
       flexDirection: "row",
       alignItems: "center",
       backgroundColor: colors.card,
-      borderRadius: 18,
-      padding: 15,
-      marginBottom: 18,
+      borderRadius: 14,
+      padding: 12,
+      marginBottom: 12,
       borderWidth: 1,
       borderColor: colors.border,
     },
 
     alertStudentAvatar: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
       backgroundColor: colors.border,
       alignItems: "center",
       justifyContent: "center",
-      marginRight: 12,
+      marginRight: 10,
     },
 
     alertStudentName: {
-      fontSize: 18,
-      fontWeight: "800",
+      fontSize: 15,
+      fontWeight: "700",
       color: colors.textPrimary,
     },
 
@@ -2158,24 +2418,24 @@ function createStyles(colors) {
 
     alertActionRow: {
       flexDirection: "row",
-      gap: 10,
-      marginTop: 18,
+      gap: 8,
+      marginTop: 12,
     },
 
     renewButton: {
       flex: 1,
-      height: 52,
-      borderRadius: 15,
+      height: 44,
+      borderRadius: 11,
       backgroundColor: colors.primaryBlue,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
-      gap: 8,
+      gap: 6,
     },
 
     renewButtonText: {
       color: "#FFFFFF",
-      fontSize: 16,
+      fontSize: 14,
       fontWeight: "700",
     },
 

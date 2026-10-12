@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   View,
@@ -37,6 +37,16 @@ export default function BookingModal({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [amount, setAmount] = useState("700");
+
+  // The modal remains mounted while hidden, so its local form state would
+  // otherwise carry over to the next seat booking.
+  useEffect(() => {
+    if (!visible) {
+      setName("");
+      setPhone("");
+      setAmount("700");
+    }
+  }, [visible]);
 
   // ==========================================================
   // CONFIRM BOOKING

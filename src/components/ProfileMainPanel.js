@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   View,
@@ -18,6 +18,7 @@ import { FontAwesome6 } from "@expo/vector-icons";
 
 import { lightColors, darkColors, radius, spacing } from "../theme/colors";
 import { useTheme } from "../context/ThemeContext";
+import SubscriptionPanel, { SubscriptionNotice } from "./SubscriptionPanel";
 
 export default function ProfileMainPanel({
   profile,
@@ -35,6 +36,10 @@ export default function ProfileMainPanel({
   onToggleEmployeeStatus,
   onDeleteEmployee,
   onRefreshEmployees,
+  subscription,
+  subscriptionStatus,
+  isSubscriptionLocked,
+  onRenewSubscription,
 }) {
   const { isDarkMode } = useTheme();
 
@@ -49,8 +54,12 @@ export default function ProfileMainPanel({
   const isMobile = width < 768;
 
   const [selectedSection, setSelectedSection] = useState(
-    isAdmin ? "admin" : "library"
+    isSubscriptionLocked ? "subscription" : isAdmin ? "admin" : "library"
   );
+
+  useEffect(() => {
+    if (isSubscriptionLocked) setSelectedSection("subscription");
+  }, [isSubscriptionLocked]);
 
   const [editingAdmin, setEditingAdmin] = useState(false);
   const [editingLibrary, setEditingLibrary] = useState(false);
@@ -345,6 +354,17 @@ export default function ProfileMainPanel({
   // =========================================================
 
   const renderRightPanel = () => {
+    if (selectedSection === "subscription") {
+      return (
+        <SubscriptionPanel
+          subscription={subscription}
+          status={subscriptionStatus}
+          isLocked={isSubscriptionLocked}
+          onRenew={onRenewSubscription}
+        />
+      );
+    }
+
     if (selectedSection === "admin") {
       return (
         <AdminPanel
@@ -438,6 +458,8 @@ export default function ProfileMainPanel({
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={styles.mobileContent}
         >
+          <SubscriptionNotice status={subscriptionStatus} />
+
           {/* MOBILE PAGE HEADER */}
           <View style={styles.mobileIntro}>
             <Text style={styles.mobileTitle}>Profile Settings</Text>
@@ -447,7 +469,7 @@ export default function ProfileMainPanel({
 
           {/* MOBILE SECTION SELECTOR */}
           <View style={styles.mobileSelector}>
-            {isAdmin && (
+            {!isSubscriptionLocked && isAdmin && (
               <SectionButton
                 icon="user"
                 title="Admin Information"
@@ -460,18 +482,20 @@ export default function ProfileMainPanel({
               />
             )}
 
-            <SectionButton
-              icon="building"
-              title="Library Information"
-              subtitle="Library details"
-              selected={selectedSection === "library"}
-              colors={colors}
-              styles={styles}
-              onPress={() => selectSection("library")}
-              isMobile
-            />
+            {!isSubscriptionLocked && (
+              <SectionButton
+                icon="building"
+                title="Library Information"
+                subtitle="Library details"
+                selected={selectedSection === "library"}
+                colors={colors}
+                styles={styles}
+                onPress={() => selectSection("library")}
+                isMobile
+              />
+            )}
 
-            {isAdmin && canManageEmployees && (
+            {!isSubscriptionLocked && isAdmin && canManageEmployees && (
               <SectionButton
                 icon="users"
                 title="Employee Management"
@@ -483,6 +507,17 @@ export default function ProfileMainPanel({
                 isMobile
               />
             )}
+
+            <SectionButton
+              icon="credit-card"
+              title="Subscription"
+              subtitle={subscription?.planName || "Plan and renewal"}
+              selected={selectedSection === "subscription"}
+              colors={colors}
+              styles={styles}
+              onPress={() => selectSection("subscription")}
+              isMobile
+            />
           </View>
 
           {/* MOBILE SELECTED CONTENT */}
@@ -498,6 +533,7 @@ export default function ProfileMainPanel({
 
   return (
     <View style={styles.wrapper}>
+      <SubscriptionNotice status={subscriptionStatus} />
       <View style={styles.masterDetail}>
         {/* LEFT */}
         <View style={styles.leftPanel}>
@@ -506,7 +542,7 @@ export default function ProfileMainPanel({
           <Text style={styles.leftPanelSubtitle}>Manage your library</Text>
 
           <View style={styles.menuContainer}>
-            {isAdmin && (
+            {!isSubscriptionLocked && isAdmin && (
               <SectionButton
                 icon="user"
                 title="Admin Information"
@@ -518,17 +554,19 @@ export default function ProfileMainPanel({
               />
             )}
 
-            <SectionButton
-              icon="building"
-              title="Library Information"
-              subtitle="Library details"
-              selected={selectedSection === "library"}
-              colors={colors}
-              styles={styles}
-              onPress={() => selectSection("library")}
-            />
+            {!isSubscriptionLocked && (
+              <SectionButton
+                icon="building"
+                title="Library Information"
+                subtitle="Library details"
+                selected={selectedSection === "library"}
+                colors={colors}
+                styles={styles}
+                onPress={() => selectSection("library")}
+              />
+            )}
 
-            {isAdmin && canManageEmployees && (
+            {!isSubscriptionLocked && isAdmin && canManageEmployees && (
               <SectionButton
                 icon="users"
                 title="Employee Management"
@@ -539,6 +577,16 @@ export default function ProfileMainPanel({
                 onPress={() => selectSection("employees")}
               />
             )}
+
+            <SectionButton
+              icon="credit-card"
+              title="Subscription"
+              subtitle={subscription?.planName || "Plan and renewal"}
+              selected={selectedSection === "subscription"}
+              colors={colors}
+              styles={styles}
+              onPress={() => selectSection("subscription")}
+            />
           </View>
         </View>
 

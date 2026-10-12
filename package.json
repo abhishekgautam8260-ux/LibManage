@@ -1,5 +1,5 @@
 {
-  "name": "seatmanager-app",
+  "name": "LibManage",
   "version": "1.0.0",
   "main": "node_modules/expo/AppEntry.js",
   "scripts": {
@@ -19,10 +19,10 @@
     "@react-navigation/native-stack": "^6.9.26",
     "axios": "^1.7.2",
     "babel-preset-expo": "~57.0.0",
-    "expo": "~57.0.24",
-    "expo-document-picker": "~57.0.2",
+    "expo": "~57.0.26",
+    "expo-document-picker": "~57.0.3",
     "expo-font": "~57.0.4",
-    "expo-sharing": "~57.0.21",
+    "expo-sharing": "~57.0.22",
     "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "react": "19.2.3",

@@ -3307,22 +3307,21 @@ function createDesktopStyles(colors) {
     studentCard: {
       flexDirection: "row",
       alignItems: "flex-start",
-
       width: "100%",
 
       backgroundColor: colors.card,
 
-      borderRadius: 16,
+      borderRadius: 14,
 
-      paddingVertical: 12,
-      paddingHorizontal: 12,
+      paddingVertical: 10,
+      paddingHorizontal: 10,
 
-      marginBottom: 10,
+      marginBottom: 8,
 
       borderWidth: 1,
       borderColor: colors.borderLight,
 
-      minHeight: 108,
+      minHeight: 96,
     },
 
     mobileProfileActionButtons: {
@@ -5342,20 +5341,20 @@ function createStyles(colors) {
     // ==========================================================
 
     searchWrapper: {
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.md,
-      paddingBottom: 4,
+      paddingHorizontal: 12,
+      paddingTop: 10,
+      paddingBottom: 2,
     },
 
     searchBox: {
       flexDirection: "row",
       alignItems: "center",
-      minHeight: 48,
+      minHeight: 44,
       backgroundColor: colors.card,
       borderWidth: 1,
       borderColor: colors.border,
       borderRadius: radius.md,
-      paddingHorizontal: 13,
+      paddingHorizontal: 11,
       shadowColor: "#000",
       shadowOpacity: 0.03,
       shadowRadius: 5,
@@ -5389,14 +5388,14 @@ function createStyles(colors) {
 
     tabsRow: {
       flexDirection: "row",
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.sm,
-      gap: 8,
+      paddingHorizontal: 12,
+      paddingTop: 6,
+      gap: 6,
     },
 
     tab: {
-      paddingVertical: 8,
-      paddingHorizontal: 16,
+      paddingVertical: 7,
+      paddingHorizontal: 14,
       borderRadius: radius.pill,
       borderWidth: 1,
       borderColor: colors.border,
@@ -5409,7 +5408,7 @@ function createStyles(colors) {
     },
 
     tabText: {
-      fontSize: 13,
+      fontSize: 12,
       fontWeight: "600",
       color: colors.textSecondary,
     },
@@ -5424,16 +5423,16 @@ function createStyles(colors) {
 
     actionRow: {
       flexDirection: "row",
-      paddingHorizontal: spacing.md,
-      paddingTop: spacing.sm,
-      paddingBottom: 4,
-      gap: 10,
+      paddingHorizontal: 12,
+      paddingTop: 6,
+      paddingBottom: 2,
+      gap: 8,
     },
 
     actionButton: {
       flex: 1,
-      minHeight: 42,
-      borderRadius: radius.md,
+      minHeight: 40,
+      borderRadius: 11,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "center",
@@ -5495,9 +5494,9 @@ function createStyles(colors) {
     },
 
     seatBadge: {
-      width: 38,
-      height: 38,
-      borderRadius: 11,
+      width: 34,
+      height: 34,
+      borderRadius: 10,
       backgroundColor: colors.statBlueBg,
       alignItems: "center",
       justifyContent: "center",
@@ -5506,7 +5505,7 @@ function createStyles(colors) {
     seatBadgeText: {
       color: colors.primaryBlue,
       fontWeight: "800",
-      fontSize: 14,
+      fontSize: 13,
     },
 
     studentInfo: {
@@ -5520,32 +5519,24 @@ function createStyles(colors) {
     },
 
     rowName: {
-      fontSize: 17,
-      fontWeight: "800",
-
+      fontSize: 15,
+      fontWeight: "700",
       color: colors.textPrimary,
-
-      lineHeight: 22,
-    },
-
-    rowMeta: {
-      fontSize: 14,
-
-      color: colors.textPrimary,
-
-      marginTop: 3,
-
       lineHeight: 19,
     },
 
-    rowDate: {
+    rowMeta: {
       fontSize: 13,
+      color: colors.textPrimary,
+      marginTop: 2,
+      lineHeight: 17,
+    },
 
+    rowDate: {
+      fontSize: 12,
       color: colors.textSecondary,
-
-      marginTop: 3,
-
-      lineHeight: 18,
+      marginTop: 2,
+      lineHeight: 16,
     },
 
     rowAmount: {
@@ -5654,17 +5645,18 @@ function createStyles(colors) {
       backgroundColor: colors.card,
       borderTopWidth: 1,
       borderTopColor: colors.border,
-      paddingHorizontal: spacing.md,
-      paddingTop: 10,
-      paddingBottom: 12,
+
+      paddingHorizontal: 12,
+      paddingTop: 8,
+      paddingBottom: 8,
     },
 
     paginationInfo: {
       textAlign: "center",
       fontSize: 11,
       fontWeight: "600",
-      color: colors.textFaint,
-      marginBottom: 9,
+      color: colors.textMuted,
+      marginBottom: 6,
     },
 
     paginationControls: {

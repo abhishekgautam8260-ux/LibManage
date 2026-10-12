@@ -10,13 +10,16 @@ import ProfileScreen from "../screens/ProfileScreen";
 import HalfDayStudentsScreen from "../screens/HalfDayStudentsScreen";
 
 import { useAuth } from "../context/AuthContext";
+import { useSubscription } from "../context/SubscriptionContext";
 import { useTheme } from "../context/ThemeContext";
 import { lightColors, darkColors } from "../theme/colors";
 import { Platform, useWindowDimensions } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 const Tab = createBottomTabNavigator();
 
 export default function MainTabs() {
+  const { isLocked: isSubscriptionLocked } = useSubscription();
   const {
     userType,
     role,
@@ -27,6 +30,7 @@ export default function MainTabs() {
   } = useAuth();
 
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
 
   const isDesktopWeb = Platform.OS === "web" && width >= 1000;
 
@@ -45,49 +49,47 @@ export default function MainTabs() {
 
   return (
     <Tab.Navigator
+      initialRouteName={isSubscriptionLocked ? "Profile" : undefined}
       screenOptions={({ route }) => ({
-        // =====================================================
-        // HEADER
-        // =====================================================
-
         headerShown: false,
 
-        // =====================================================
-        // TAB COLORS
-        // =====================================================
+        tabBarLabelPosition: "below-icon",
 
         tabBarActiveTintColor: colors.primaryBlue,
         tabBarInactiveTintColor: colors.textMuted,
-
-        // =====================================================
-        // TAB BAR
-        // =====================================================
 
         tabBarStyle: isDesktopWeb
           ? {
               display: "none",
             }
           : {
-              height: 64,
-              paddingBottom: 8,
-              paddingTop: 6,
+              height: 58 + insets.bottom,
+
+              paddingTop: 4,
+              paddingBottom: Math.max(insets.bottom, 6),
+
               backgroundColor: colors.card,
+
               borderTopColor: colors.border,
               borderTopWidth: 1,
+
+              elevation: 8,
+
+              shadowColor: "#000",
+              shadowOpacity: 0.08,
+              shadowRadius: 8,
+              shadowOffset: {
+                width: 0,
+                height: -2,
+              },
             },
 
-        // =====================================================
-        // TAB LABEL
-        // =====================================================
-
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 10,
           fontWeight: "600",
+          marginTop: 0,
+          paddingBottom: 1,
         },
-
-        // =====================================================
-        // TAB ICON
-        // =====================================================
 
         tabBarIcon: ({ color }) => {
           const icons = {
@@ -101,7 +103,7 @@ export default function MainTabs() {
           return (
             <FontAwesome6
               name={icons[route.name] || "circle"}
-              size={18}
+              size={17}
               color={color}
             />
           );
@@ -112,7 +114,7 @@ export default function MainTabs() {
           HOME / DASHBOARD
       ===================================================== */}
 
-      {canViewDashboard && (
+      {!isSubscriptionLocked && canViewDashboard && (
         <Tab.Screen
           name="Home"
           component={HomeStack}
@@ -126,7 +128,7 @@ export default function MainTabs() {
           BILLING
       ===================================================== */}
 
-      {canManageBilling && (
+      {!isSubscriptionLocked && canManageBilling && (
         <Tab.Screen
           name="Billing"
           component={BillingScreen}
@@ -140,7 +142,7 @@ export default function MainTabs() {
           STUDENTS
       ===================================================== */}
 
-      {canViewStudents && (
+      {!isSubscriptionLocked && canViewStudents && (
         <Tab.Screen
           name="Students"
           component={StudentsScreen}
@@ -154,7 +156,7 @@ export default function MainTabs() {
           HALF DAY STUDENTS
       ===================================================== */}
 
-      <Tab.Screen
+      {!isSubscriptionLocked && <Tab.Screen
         name="HalfDayStudents"
         component={HalfDayStudentsScreen}
         options={{
@@ -164,7 +166,7 @@ export default function MainTabs() {
           // Keep the route available for DesktopLayout.
           tabBarButton: isDesktopWeb ? undefined : () => null,
         }}
-      />
+      />}
 
       {/* =====================================================
           PROFILE
