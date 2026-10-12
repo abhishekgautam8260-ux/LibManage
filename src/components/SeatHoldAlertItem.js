@@ -39,13 +39,12 @@ function formatHoldDate(dateString) {
 // COMPONENT
 // ============================================================
 
-export default function SeatHoldAlertItem({ alert, onPress, onRemove }) {
+export default function SeatHoldAlertItem({ alert, onPress }) {
   const { isDarkMode } = useTheme();
 
   const colors = isDarkMode ? darkColors : lightColors;
 
   const styles = createStyles(colors);
-  const isExpired = alert?.alertType === "SEAT_HOLD_EXPIRED";
 
   // ==========================================================
   // WHATSAPP
@@ -112,18 +111,15 @@ export default function SeatHoldAlertItem({ alert, onPress, onRemove }) {
         </View>
 
         {/* ACTIVE */}
-            <Text style={isExpired ? styles.statusExpired : styles.statusActive}>
-              {isExpired ? "EXPIRED" : "ACTIVE"}
-            </Text>
+        <Text style={styles.statusActive}>ACTIVE</Text>
       </View>
 
       {/* ======================================================
           HOLD UNTIL
           ====================================================== */}
 
-      <Text style={[styles.holdUntil, isExpired && styles.expiredHoldUntil]}>
-        {isExpired ? "Hold expired " : "Hold until "}
-        {formatHoldDate(alert?.holdUntil || alert?.expiresAt)}
+      <Text style={styles.holdUntil}>
+        Hold until {formatHoldDate(alert?.holdUntil)}
       </Text>
 
       {/* ======================================================
@@ -152,17 +148,6 @@ export default function SeatHoldAlertItem({ alert, onPress, onRemove }) {
 
           <Text style={styles.callText}>Call</Text>
         </TouchableOpacity>
-
-        {isExpired && (
-          <TouchableOpacity
-            style={styles.removeHold}
-            activeOpacity={0.8}
-            onPress={onRemove}
-          >
-            <FontAwesome6 name="trash" size={13} color="#FFFFFF" />
-            <Text style={styles.removeHoldText}>Remove</Text>
-          </TouchableOpacity>
-        )}
       </View>
     </TouchableOpacity>
   );
@@ -275,12 +260,6 @@ function createStyles(colors) {
       color: colors.warning,
     },
 
-    statusExpired: {
-      fontSize: 12,
-      fontWeight: "700",
-      color: colors.danger,
-    },
-
     // ========================================================
     // HOLD UNTIL
     // ========================================================
@@ -293,10 +272,6 @@ function createStyles(colors) {
       fontWeight: "700",
 
       color: colors.warning,
-    },
-
-    expiredHoldUntil: {
-      color: colors.danger,
     },
 
     // ========================================================
@@ -373,23 +348,6 @@ function createStyles(colors) {
       fontSize: 13,
 
       color: colors.textSecondary,
-    },
-
-    removeHold: {
-      flex: 1,
-      flexDirection: "row",
-      gap: 6,
-      alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: colors.danger,
-      paddingVertical: 10,
-      borderRadius: radius.sm,
-    },
-
-    removeHoldText: {
-      color: "#FFFFFF",
-      fontWeight: "600",
-      fontSize: 13,
     },
   });
 }

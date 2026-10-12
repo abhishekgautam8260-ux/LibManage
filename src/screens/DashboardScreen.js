@@ -531,26 +531,6 @@ export default function DashboardScreen() {
     }
   };
 
-  const handleRemoveExpiredSeatHold = async (alert) => {
-    const holdId = alert?.holdId ?? alert?.id;
-    if (holdId === undefined || holdId === null) {
-      Alert.alert("Unable to remove hold", "The hold record ID is missing.");
-      return;
-    }
-
-    try {
-      await cancelSeatHold(holdId);
-      await loadAll();
-    } catch (error) {
-      Alert.alert(
-        "Unable to remove hold",
-        error?.response?.data?.message ||
-          error?.message ||
-          "Please try again."
-      );
-    }
-  };
-
   const handleBookHeldSeat = async (seat) => {
     console.log("📚 Booking held seat:", seat);
 
@@ -1087,25 +1067,6 @@ export default function DashboardScreen() {
   const combinedAlerts = [...activeSeatHolds, ...alerts];
 
   const visibleAlerts = combinedAlerts;
-  const expiredSeatHoldAlerts = alerts.filter(
-    (item) => item.alertType === "SEAT_HOLD_EXPIRED"
-  );
-  const gridSeats = seats.map((seat) => {
-    if (seat.occupied || seat.held) return seat;
-    const expiredHold = expiredSeatHoldAlerts.find(
-      (item) => Number(item.seatNumber) === Number(seat.seatNumber)
-    );
-    return expiredHold
-      ? {
-          ...seat,
-          held: true,
-          holdId: expiredHold.holdId ?? expiredHold.id,
-          holdName: expiredHold.name,
-          holdPhone: expiredHold.phone,
-          holdUntil: expiredHold.holdUntil,
-        }
-      : seat;
-  });
 
   // ============================================================
   // UI
@@ -1123,7 +1084,7 @@ export default function DashboardScreen() {
           <DesktopDashboard
             navigation={navigation}
             stats={stats}
-            seats={gridSeats}
+            seats={seats}
             combinedAlerts={combinedAlerts}
             visibleAlerts={visibleAlerts}
             refreshing={refreshing}
@@ -1143,7 +1104,6 @@ export default function DashboardScreen() {
                 setHeldSeatModalVisible(true);
               }
             }}
-            onRemoveExpiredHold={handleRemoveExpiredSeatHold}
           />
         </>
       ) : (
@@ -1290,9 +1250,9 @@ export default function DashboardScreen() {
                       <View
                         key={
                           item.alertType === "SEAT_HOLD_ACTIVE"
-                            ? `active-hold-${item.holdId ?? item.id}`
+                            ? `active-hold-${item.id}`
                             : item.alertType === "SEAT_HOLD_EXPIRED"
-                            ? `expired-hold-${item.holdId ?? item.id}`
+                            ? `expired-hold-${item.id}`
                             : `student-${
                                 item.id ?? `${item.seatNumber}-${item.phone}`
                               }`
@@ -1325,11 +1285,7 @@ export default function DashboardScreen() {
                             }}
                           />
                         ) : item.alertType === "SEAT_HOLD_EXPIRED" ? (
-                          <SeatHoldAlertItem
-                            alert={item}
-                            onPress={() => {}}
-                            onRemove={() => handleRemoveExpiredSeatHold(item)}
-                          />
+                          <SeatHoldAlertItem alert={item} onPress={() => {}} />
                         ) : (
                           <AlertItem
                             student={item}
@@ -1391,7 +1347,7 @@ export default function DashboardScreen() {
               </View>
 
               <SeatGrid
-                seats={gridSeats}
+                seats={seats}
                 onVacantPress={handleVacantPress}
                 onOccupiedPress={handleOccupiedPress}
                 onHeldPress={handleHeldPress}

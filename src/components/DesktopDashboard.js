@@ -21,12 +21,8 @@ import { lightColors, darkColors, radius, spacing } from "../theme/colors";
 import { useTheme } from "../context/ThemeContext";
 
 function getAlertKey(item) {
-  if (item.alertType === "SEAT_HOLD_ACTIVE") {
-    return `active-hold-${item.holdId ?? item.id}`;
-  }
-  if (item.alertType === "SEAT_HOLD_EXPIRED") {
-    return `expired-hold-${item.holdId ?? item.id}`;
-  }
+  if (item.alertType === "SEAT_HOLD_ACTIVE") return `active-hold-${item.id}`;
+  if (item.alertType === "SEAT_HOLD_EXPIRED") return `expired-hold-${item.id}`;
   return `student-${item.id ?? `${item.seatNumber}-${item.phone}`}`;
 }
 
@@ -51,7 +47,6 @@ export default function DesktopDashboard({
   onAlertStudentPress,
 
   onActiveHoldPress,
-  onRemoveExpiredHold,
 }) {
   const { isDarkMode } = useTheme();
 
@@ -388,11 +383,7 @@ export default function DesktopDashboard({
                             onPress={() => onActiveHoldPress(item)}
                           />
                         ) : item.alertType === "SEAT_HOLD_EXPIRED" ? (
-                          <SeatHoldAlertItem
-                            alert={item}
-                            onPress={() => {}}
-                            onRemove={() => onRemoveExpiredHold(item)}
-                          />
+                          <SeatHoldAlertItem alert={item} onPress={() => {}} />
                         ) : (
                           <AlertItem
                             student={item}
